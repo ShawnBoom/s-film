@@ -1,5 +1,5 @@
-const CACHE_NAME = "s-film-v1";
-const APP_SHELL = ["/", "/sample-neutral.png", "/s-film-social.png"];
+const CACHE_NAME = "s-film-v2";
+const APP_SHELL = ["/", "/sample-neutral.png", "/og.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

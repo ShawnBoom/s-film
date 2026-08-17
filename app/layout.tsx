@@ -1,23 +1,38 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import { PwaRegister } from "./pwa-register";
 
-export const metadata: Metadata = {
-  title: "S Film｜手机胶片滤镜",
-  description: "不登录、不上传，在手机本地为照片添加胶片质感。",
-  applicationName: "S Film",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    title: "S Film",
-    statusBarStyle: "black-translucent",
-  },
-  openGraph: {
+export async function generateMetadata(): Promise<Metadata> {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
+  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const origin = `${protocol}://${host}`;
+  const socialImage = `${origin}/og.png`;
+
+  return {
     title: "S Film｜手机胶片滤镜",
     description: "不登录、不上传，在手机本地为照片添加胶片质感。",
-    images: [{ url: "/s-film-social.png", width: 1733, height: 909, alt: "S Film 胶片摄影" }],
-  },
-};
+    applicationName: "S Film",
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      title: "S Film",
+      statusBarStyle: "black-translucent",
+    },
+    openGraph: {
+      title: "S Film｜手机胶片滤镜",
+      description: "不登录、不上传，在手机本地为照片添加胶片质感。",
+      images: [{ url: socialImage, width: 1731, height: 909, alt: "S Film" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "S Film｜手机胶片滤镜",
+      description: "不登录、不上传，在手机本地为照片添加胶片质感。",
+      images: [socialImage],
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#f2efe7",

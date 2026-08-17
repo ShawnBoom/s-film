@@ -298,9 +298,9 @@ export default function Home() {
       </header>
 
       <section className="intro">
-        <p className="eyebrow">MOBILE FILM STUDIO</p>
-        <h1>给日常，加一点<br />胶片感。</h1>
-        <p className="intro-copy">不登录，不上传。选照片、挑滤镜、保存，就这么简单。</p>
+        <p className="eyebrow">LOCAL PHOTO LAB</p>
+        <h1>手机里的胶片。</h1>
+        <p className="intro-copy">选照片，挑滤镜，保存。没有多余步骤。</p>
       </section>
 
       <section className="workspace">
