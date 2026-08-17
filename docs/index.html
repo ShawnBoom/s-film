@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f5f0" />
+    <meta name="description" content="不登录、不上传，在手机本地为照片添加胶片质感。" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="S Film" />
+    <title>S Film｜手机胶片滤镜</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">S FILM</div>
+        <div class="privacy-pill"><span></span> 照片仅在本机处理</div>
+      </header>
+
+      <section class="intro">
+        <p class="eyebrow">LOCAL PHOTO LAB</p>
+        <h1>手机里的胶片。</h1>
+        <p class="intro-copy">选照片，挑滤镜，保存。没有多余步骤。</p>
+      </section>
+
+      <section class="workspace">
+        <div class="photo-panel">
+          <div class="photo-frame">
+            <canvas id="preview" aria-label="滤镜实时预览"></canvas>
+            <div class="film-mark" id="film-mark">FUJI Classic Chrome</div>
+            <button type="button" class="compare-button" id="compare-button">按住看原图</button>
+            <div class="photo-count" id="photo-count" hidden></div>
+          </div>
+
+          <div class="thumbnail-row" id="thumbnail-row" aria-label="已选照片" hidden></div>
+
+          <div class="photo-actions">
+            <label class="upload-button">
+              <span class="plus">＋</span>
+              <span id="upload-copy">选择手机照片</span>
+              <input id="photo-input" type="file" accept="image/*" multiple />
+            </label>
+            <button type="button" class="remove-button" id="remove-button" hidden>移除当前</button>
+          </div>
+          <p class="upload-hint">可一次选择多张 · 原图不会被修改 · 最多 20 张</p>
+        </div>
+
+        <div class="controls-panel">
+          <div class="section-heading">
+            <span>01</span>
+            <h2>选择一种感觉</h2>
+          </div>
+
+          <div class="filter-list">
+            <button type="button" class="filter-card active" data-filter="classic">
+              <span class="swatch swatch-classic"></span>
+              <span class="filter-copy"><strong>FUJI Classic Chrome</strong><small>克制 · 青灰 · 安静</small></span>
+              <span class="filter-number">01</span>
+            </button>
+            <button type="button" class="filter-card" data-filter="gold">
+              <span class="swatch swatch-gold"></span>
+              <span class="filter-copy"><strong>KODAK Gold 200</strong><small>暖阳 · 鲜活 · 怀旧</small></span>
+              <span class="filter-number">02</span>
+            </button>
+            <button type="button" class="filter-card" data-filter="youth">
+              <span class="swatch swatch-youth"></span>
+              <span class="filter-copy"><strong>FUJI Youth Blue</strong><small>蓝天 · 街头 · 自由</small></span>
+              <span class="filter-number">03</span>
+            </button>
+          </div>
+
+          <div class="adjustments-heading">
+            <div class="section-heading compact"><span>02</span><h2>简单微调</h2></div>
+            <button type="button" id="reset-button">还原</button>
+          </div>
+
+          <div class="adjustment-list">
+            <label class="slider-control">
+              <span class="control-label"><span>滤镜浓度</span><strong id="strength-value">72</strong></span>
+              <input id="strength" aria-label="滤镜浓度" type="range" min="0" max="100" value="72" />
+            </label>
+            <label class="slider-control">
+              <span class="control-label"><span>亮度</span><strong id="brightness-value">0</strong></span>
+              <input id="brightness" aria-label="亮度" type="range" min="-25" max="25" value="0" />
+            </label>
+            <label class="slider-control">
+              <span class="control-label"><span>色彩</span><strong id="color-value">0</strong></span>
+              <input id="color" aria-label="色彩" type="range" min="-30" max="30" value="0" />
+            </label>
+            <label class="slider-control">
+              <span class="control-label"><span>颗粒</span><strong id="grain-value">8</strong></span>
+              <input id="grain" aria-label="颗粒" type="range" min="0" max="30" value="8" />
+            </label>
+          </div>
+
+          <button class="primary-button" id="export-button" type="button">
+            <span id="export-copy">保存 / 分享照片</span>
+            <span aria-hidden="true">→</span>
+          </button>
+          <p class="status-line" id="status-line" role="status">示例预览 · 请选择你的照片</p>
+          <p class="local-note">所有滤镜计算都在当前设备完成，照片不会发送到服务器。</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
