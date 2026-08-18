@@ -18,6 +18,7 @@ const state = {
   brightness: 0,
   color: 0,
   grain: 8,
+  activeAdjustment: "strength",
   comparing: false,
   busy: false,
   sourceData: null,
@@ -26,7 +27,6 @@ const state = {
 const elements = {
   canvas: document.querySelector("#preview"),
   filmMark: document.querySelector("#film-mark"),
-  heroUpload: document.querySelector("#hero-upload"),
   compareButton: document.querySelector("#compare-button"),
   photoCount: document.querySelector("#photo-count"),
   thumbnailRow: document.querySelector("#thumbnail-row"),
@@ -38,6 +38,8 @@ const elements = {
   exportCopy: document.querySelector("#export-copy"),
   status: document.querySelector("#status-line"),
   filters: Array.from(document.querySelectorAll("[data-filter]")),
+  adjustmentTabs: Array.from(document.querySelectorAll("[data-adjustment]")),
+  sliderControls: Array.from(document.querySelectorAll("[data-slider]")),
   sliders: {
     strength: document.querySelector("#strength"),
     brightness: document.querySelector("#brightness"),
@@ -280,13 +282,24 @@ function removeActivePhoto() {
 function chooseFilter(filter) {
   state.activeFilter = filter;
   state.grain = FILTERS[filter].defaultGrain;
-  document.documentElement.dataset.filter = filter;
   elements.filmMark.textContent = FILTERS[filter].name;
   elements.filters.forEach((button) => {
     button.classList.toggle("active", button.dataset.filter === filter);
   });
   updateSlider("grain");
   drawPreview();
+}
+
+function chooseAdjustment(adjustment) {
+  state.activeAdjustment = adjustment;
+  elements.adjustmentTabs.forEach((button) => {
+    const active = button.dataset.adjustment === adjustment;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  elements.sliderControls.forEach((control) => {
+    control.classList.toggle("active", control.dataset.slider === adjustment);
+  });
 }
 
 function resetAdjustments() {
@@ -381,12 +394,14 @@ elements.input.addEventListener("change", (event) => {
   addPhotos(event.target.files || []);
   event.target.value = "";
 });
-elements.heroUpload.addEventListener("click", () => elements.input.click());
 elements.removeButton.addEventListener("click", removeActivePhoto);
 elements.resetButton.addEventListener("click", resetAdjustments);
 elements.exportButton.addEventListener("click", exportPhotos);
 elements.filters.forEach((button) => {
   button.addEventListener("click", () => chooseFilter(button.dataset.filter));
+});
+elements.adjustmentTabs.forEach((button) => {
+  button.addEventListener("click", () => chooseAdjustment(button.dataset.adjustment));
 });
 
 Object.keys(elements.sliders).forEach((name) => {

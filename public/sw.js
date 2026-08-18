@@ -1,4 +1,4 @@
-const CACHE_NAME = "s-film-v2";
+const CACHE_NAME = "s-film-v3";
 const APP_SHELL = ["/", "/sample-neutral.png", "/og.png"];
 
 self.addEventListener("install", (event) => {

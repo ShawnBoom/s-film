@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN" data-filter="classic">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f6f5f0" />
+    <meta name="theme-color" content="#f4f2eb" />
     <meta name="description" content="不登录、不上传，在手机本地为照片添加胶片质感。" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -26,47 +26,21 @@
   <body>
     <main class="app-shell">
       <header class="topbar">
-        <div class="brand"><span>S</span> FILM</div>
+        <div class="brand">S FILM</div>
         <div class="privacy-pill"><span></span> 照片仅在本机处理</div>
       </header>
 
-      <section class="intro">
-        <div class="intro-content">
-          <p class="eyebrow">LOCAL PHOTO LAB · 2026</p>
-          <h1>把日常，<br />留在胶片里。</h1>
-          <p class="intro-copy">三种克制的胶片色彩。选照片，挑感觉，保存。没有多余步骤。</p>
-          <button class="hero-upload" id="hero-upload" type="button">
-            <span>选择手机照片</span><span aria-hidden="true">→</span>
-          </button>
-        </div>
-
-        <figure class="cover-card">
-          <img src="./s-film-social.png" alt="胶片、色纸与阳光组成的 S Film 封面" />
-          <figcaption><span>S FILM / 001</span><span>LIGHT, COLOR, MEMORY</span></figcaption>
-        </figure>
-
-        <div class="hero-facts" aria-label="产品特点">
-          <span><strong>03</strong> FILM LOOKS</span>
-          <span><strong>20</strong> PHOTOS / BATCH</span>
-          <span><strong>00</strong> CLOUD UPLOADS</span>
-        </div>
-      </section>
-
-      <div class="lab-heading" id="lab">
-        <p>YOUR LOCAL LAB</p>
-        <span>选择照片后即可实时调整</span>
-      </div>
-
       <section class="workspace">
-        <div class="photo-panel">
+        <div class="photo-stage">
           <div class="photo-frame">
             <canvas id="preview" aria-label="滤镜实时预览"></canvas>
-            <div class="preview-kicker">PREVIEW</div>
             <div class="film-mark" id="film-mark">FUJI Classic Chrome</div>
             <button type="button" class="compare-button" id="compare-button">按住看原图</button>
             <div class="photo-count" id="photo-count" hidden></div>
           </div>
+        </div>
 
+        <div class="controls-panel">
           <div class="thumbnail-row" id="thumbnail-row" aria-label="已选照片" hidden></div>
 
           <div class="photo-actions">
@@ -78,51 +52,50 @@
             <button type="button" class="remove-button" id="remove-button" hidden>移除当前</button>
           </div>
           <p class="upload-hint">可一次选择多张 · 原图不会被修改 · 最多 20 张</p>
-        </div>
 
-        <div class="controls-panel">
-          <div class="section-heading">
-            <span>01</span>
-            <h2>选择一种胶片感觉</h2>
+          <div class="section-heading filter-heading">
+            <h2>滤镜</h2>
+            <span>选择一种感觉</span>
           </div>
 
           <div class="filter-list">
             <button type="button" class="filter-card active" data-filter="classic">
-              <span class="swatch swatch-classic"></span>
-              <span class="filter-copy"><strong>FUJI Classic Chrome</strong><small>克制 · 青灰 · 安静</small></span>
-              <span class="filter-number">01</span>
+              <span class="filter-number">01</span><strong>FUJI Classic Chrome</strong>
             </button>
             <button type="button" class="filter-card" data-filter="gold">
-              <span class="swatch swatch-gold"></span>
-              <span class="filter-copy"><strong>KODAK Gold 200</strong><small>暖阳 · 鲜活 · 怀旧</small></span>
-              <span class="filter-number">02</span>
+              <span class="filter-number">02</span><strong>KODAK Gold 200</strong>
             </button>
             <button type="button" class="filter-card" data-filter="youth">
-              <span class="swatch swatch-youth"></span>
-              <span class="filter-copy"><strong>FUJI Youth Blue</strong><small>蓝天 · 街头 · 自由</small></span>
-              <span class="filter-number">03</span>
+              <span class="filter-number">03</span><strong>FUJI Youth Blue</strong>
             </button>
           </div>
 
           <div class="adjustments-heading">
-            <div class="section-heading compact"><span>02</span><h2>简单微调</h2></div>
+            <h2>微调</h2>
             <button type="button" id="reset-button">还原</button>
           </div>
 
+          <div class="adjustment-tabs" role="tablist" aria-label="微调项目">
+            <button type="button" role="tab" aria-selected="true" class="active" data-adjustment="strength">浓度</button>
+            <button type="button" role="tab" aria-selected="false" data-adjustment="brightness">亮度</button>
+            <button type="button" role="tab" aria-selected="false" data-adjustment="color">色彩</button>
+            <button type="button" role="tab" aria-selected="false" data-adjustment="grain">颗粒</button>
+          </div>
+
           <div class="adjustment-list">
-            <label class="slider-control">
-              <span class="control-label"><span>滤镜浓度</span><strong id="strength-value">72</strong></span>
-              <input id="strength" aria-label="滤镜浓度" type="range" min="0" max="100" value="72" />
+            <label class="slider-control active" data-slider="strength">
+              <span class="control-label"><span>浓度</span><strong id="strength-value">72</strong></span>
+              <input id="strength" aria-label="浓度" type="range" min="0" max="100" value="72" />
             </label>
-            <label class="slider-control">
+            <label class="slider-control" data-slider="brightness">
               <span class="control-label"><span>亮度</span><strong id="brightness-value">0</strong></span>
               <input id="brightness" aria-label="亮度" type="range" min="-25" max="25" value="0" />
             </label>
-            <label class="slider-control">
+            <label class="slider-control" data-slider="color">
               <span class="control-label"><span>色彩</span><strong id="color-value">0</strong></span>
               <input id="color" aria-label="色彩" type="range" min="-30" max="30" value="0" />
             </label>
-            <label class="slider-control">
+            <label class="slider-control" data-slider="grain">
               <span class="control-label"><span>颗粒</span><strong id="grain-value">8</strong></span>
               <input id="grain" aria-label="颗粒" type="range" min="0" max="30" value="8" />
             </label>
@@ -136,11 +109,6 @@
           <p class="local-note">所有滤镜计算都在当前设备完成，照片不会发送到服务器。</p>
         </div>
       </section>
-
-      <footer class="site-footer">
-        <div><strong>S FILM</strong><span>日常即底片。</span></div>
-        <p>在 iPhone Safari 中选择“分享 → 添加到主屏幕”，可像 App 一样打开。</p>
-      </footer>
     </main>
   </body>
 </html>

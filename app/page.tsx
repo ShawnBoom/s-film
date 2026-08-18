@@ -12,6 +12,7 @@ const FILTERS = [
 type FilterId = (typeof FILTERS)[number]["id"];
 type PhotoItem = { id: string; file: File; url: string };
 type Adjustments = { strength: number; brightness: number; color: number; grain: number };
+type AdjustmentId = keyof Adjustments;
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 1400;
@@ -112,6 +113,7 @@ export default function Home() {
   const [brightness, setBrightness] = useState(0);
   const [color, setColor] = useState(0);
   const [grain, setGrain] = useState(8);
+  const [activeAdjustment, setActiveAdjustment] = useState<AdjustmentId>("strength");
   const [sourceVersion, setSourceVersion] = useState(0);
   const [comparing, setComparing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -290,6 +292,52 @@ export default function Home() {
     if (event.key === " " || event.key === "Enter") setComparing(true);
   };
 
+  const adjustmentControls = {
+    strength: {
+      label: "浓度",
+      value: strength,
+      min: 0,
+      max: 100,
+      progress: strength,
+      setValue: setStrength,
+    },
+    brightness: {
+      label: "亮度",
+      value: brightness,
+      min: -25,
+      max: 25,
+      progress: (brightness + 25) * 2,
+      setValue: setBrightness,
+    },
+    color: {
+      label: "色彩",
+      value: color,
+      min: -30,
+      max: 30,
+      progress: ((color + 30) / 60) * 100,
+      setValue: setColor,
+    },
+    grain: {
+      label: "颗粒",
+      value: grain,
+      min: 0,
+      max: 30,
+      progress: (grain / 30) * 100,
+      setValue: setGrain,
+    },
+  } satisfies Record<AdjustmentId, {
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    progress: number;
+    setValue: (value: number) => void;
+  }>;
+  const currentAdjustment = adjustmentControls[activeAdjustment];
+  const displayAdjustmentValue = ["brightness", "color"].includes(activeAdjustment) && currentAdjustment.value > 0
+    ? `+${currentAdjustment.value}`
+    : currentAdjustment.value;
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -297,14 +345,8 @@ export default function Home() {
         <div className="privacy-pill"><span /> 照片仅在本机处理</div>
       </header>
 
-      <section className="intro">
-        <p className="eyebrow">LOCAL PHOTO LAB</p>
-        <h1>手机里的胶片。</h1>
-        <p className="intro-copy">选照片，挑滤镜，保存。没有多余步骤。</p>
-      </section>
-
       <section className="workspace">
-        <div className="photo-panel">
+        <div className="photo-stage">
           <div className="photo-frame">
             <canvas ref={canvasRef} aria-label="滤镜实时预览" />
             <div className="film-mark">{selectedName}</div>
@@ -322,7 +364,9 @@ export default function Home() {
             </button>
             {photos.length > 0 && <div className="photo-count">{activeIndex + 1} / {photos.length}</div>}
           </div>
+        </div>
 
+        <div className="controls-panel">
           {photos.length > 0 && (
             <div className="thumbnail-row" aria-label="已选照片">
               {photos.map((photo, index) => (
@@ -352,12 +396,10 @@ export default function Home() {
             )}
           </div>
           <p className="upload-hint">可一次选择多张 · 原图不会被修改 · 最多 {MAX_PHOTOS} 张</p>
-        </div>
 
-        <div className="controls-panel">
-          <div className="section-heading">
-            <span>01</span>
-            <h2>选择一种感觉</h2>
+          <div className="section-heading filter-heading">
+            <h2>滤镜</h2>
+            <span>选择一种感觉</span>
           </div>
 
           <div className="filter-list">
@@ -368,38 +410,46 @@ export default function Home() {
                 className={`filter-card ${activeFilter === filter.id ? "active" : ""}`}
                 onClick={() => chooseFilter(filter.id)}
               >
-                <span className={`swatch swatch-${filter.id}`} />
-                <span className="filter-copy">
-                  <strong>{filter.name}</strong>
-                  <small>{filter.note}</small>
-                </span>
                 <span className="filter-number">0{index + 1}</span>
+                <strong>{filter.name}</strong>
               </button>
             ))}
           </div>
 
           <div className="adjustments-heading">
-            <div className="section-heading compact"><span>02</span><h2>简单微调</h2></div>
+            <h2>微调</h2>
             <button type="button" onClick={resetAdjustments}>还原</button>
           </div>
 
-          <div className="adjustment-list">
-            <div className="slider-control">
-              <span className="control-label"><span>滤镜浓度</span><strong>{strength}</strong></span>
-              <input aria-label="滤镜浓度" type="range" min="0" max="100" value={strength} onChange={(event) => setStrength(Number(event.target.value))} style={rangeStyle(strength)} />
-            </div>
-            <div className="slider-control">
-              <span className="control-label"><span>亮度</span><strong>{brightness > 0 ? `+${brightness}` : brightness}</strong></span>
-              <input aria-label="亮度" type="range" min="-25" max="25" value={brightness} onChange={(event) => setBrightness(Number(event.target.value))} style={rangeStyle((brightness + 25) * 2)} />
-            </div>
-            <div className="slider-control">
-              <span className="control-label"><span>色彩</span><strong>{color > 0 ? `+${color}` : color}</strong></span>
-              <input aria-label="色彩" type="range" min="-30" max="30" value={color} onChange={(event) => setColor(Number(event.target.value))} style={rangeStyle(((color + 30) / 60) * 100)} />
-            </div>
-            <div className="slider-control">
-              <span className="control-label"><span>颗粒</span><strong>{grain}</strong></span>
-              <input aria-label="颗粒" type="range" min="0" max="30" value={grain} onChange={(event) => setGrain(Number(event.target.value))} style={rangeStyle((grain / 30) * 100)} />
-            </div>
+          <div className="adjustment-tabs" role="tablist" aria-label="微调项目">
+            {(Object.keys(adjustmentControls) as AdjustmentId[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={activeAdjustment === id}
+                className={activeAdjustment === id ? "active" : ""}
+                onClick={() => setActiveAdjustment(id)}
+              >
+                {adjustmentControls[id].label}
+              </button>
+            ))}
+          </div>
+
+          <div className="adjustment-control">
+            <span className="control-label">
+              <span>{currentAdjustment.label}</span>
+              <strong>{displayAdjustmentValue}</strong>
+            </span>
+            <input
+              aria-label={currentAdjustment.label}
+              type="range"
+              min={currentAdjustment.min}
+              max={currentAdjustment.max}
+              value={currentAdjustment.value}
+              onChange={(event) => currentAdjustment.setValue(Number(event.target.value))}
+              style={rangeStyle(currentAdjustment.progress)}
+            />
           </div>
 
           <button className="primary-button" type="button" onClick={exportPhotos} disabled={busy}>
