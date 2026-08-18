@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f4f2eb" />
+    <meta name="theme-color" content="#1b1c1a" />
     <meta name="description" content="不登录、不上传，在手机本地为照片添加胶片质感。" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="S Film" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="S Film｜手机胶片滤镜" />
@@ -30,51 +30,23 @@
         <div class="privacy-pill"><span></span> 照片仅在本机处理</div>
       </header>
 
-      <section class="workspace">
-        <div class="photo-stage">
-          <div class="photo-frame">
-            <canvas id="preview" aria-label="滤镜实时预览"></canvas>
-            <div class="film-mark" id="film-mark">FUJI Classic Chrome</div>
-            <button type="button" class="compare-button" id="compare-button">按住看原图</button>
-            <div class="photo-count" id="photo-count" hidden></div>
-          </div>
+      <section class="editor">
+        <div class="photo-frame">
+          <canvas id="preview" aria-label="滤镜实时预览"></canvas>
+          <label class="photo-picker" aria-label="选择手机照片">
+            <input id="photo-input" type="file" accept="image/*" multiple />
+          </label>
+          <button type="button" class="compare-button" id="compare-button">按住看原图</button>
+          <button type="button" class="photo-count" id="photo-count">轻点选照片</button>
         </div>
 
-        <div class="controls-panel">
-          <div class="thumbnail-row" id="thumbnail-row" aria-label="已选照片" hidden></div>
+        <div class="filter-strip" aria-label="选择滤镜">
+          <button type="button" class="active" data-filter="classic" aria-pressed="true" aria-label="FUJI Classic Chrome"><strong>Classic Chrome</strong><span>FUJI</span></button>
+          <button type="button" data-filter="gold" aria-pressed="false" aria-label="KODAK Gold 200"><strong>Gold 200</strong><span>KODAK</span></button>
+          <button type="button" data-filter="youth" aria-pressed="false" aria-label="FUJI Youth Blue"><strong>Youth Blue</strong><span>FUJI</span></button>
+        </div>
 
-          <div class="photo-actions">
-            <label class="upload-button">
-              <span class="plus">＋</span>
-              <span id="upload-copy">选择手机照片</span>
-              <input id="photo-input" type="file" accept="image/*" multiple />
-            </label>
-            <button type="button" class="remove-button" id="remove-button" hidden>移除当前</button>
-          </div>
-          <p class="upload-hint">可一次选择多张 · 原图不会被修改 · 最多 20 张</p>
-
-          <div class="section-heading filter-heading">
-            <h2>滤镜</h2>
-            <span>选择一种感觉</span>
-          </div>
-
-          <div class="filter-list">
-            <button type="button" class="filter-card active" data-filter="classic">
-              <span class="filter-number">01</span><strong>FUJI Classic Chrome</strong>
-            </button>
-            <button type="button" class="filter-card" data-filter="gold">
-              <span class="filter-number">02</span><strong>KODAK Gold 200</strong>
-            </button>
-            <button type="button" class="filter-card" data-filter="youth">
-              <span class="filter-number">03</span><strong>FUJI Youth Blue</strong>
-            </button>
-          </div>
-
-          <div class="adjustments-heading">
-            <h2>微调</h2>
-            <button type="button" id="reset-button">还原</button>
-          </div>
-
+        <div class="adjustments">
           <div class="adjustment-tabs" role="tablist" aria-label="微调项目">
             <button type="button" role="tab" aria-selected="true" class="active" data-adjustment="strength">浓度</button>
             <button type="button" role="tab" aria-selected="false" data-adjustment="brightness">亮度</button>
@@ -100,14 +72,13 @@
               <input id="grain" aria-label="颗粒" type="range" min="0" max="30" value="8" />
             </label>
           </div>
-
-          <button class="primary-button" id="export-button" type="button">
-            <span id="export-copy">保存 / 分享照片</span>
-            <span aria-hidden="true">→</span>
-          </button>
-          <p class="status-line" id="status-line" role="status">示例预览 · 请选择你的照片</p>
-          <p class="local-note">所有滤镜计算都在当前设备完成，照片不会发送到服务器。</p>
         </div>
+
+        <button class="primary-button" id="export-button" type="button">
+          <span id="export-copy">保存照片</span><span aria-hidden="true">→</span>
+        </button>
+        <button type="button" class="reset-button" id="reset-button">还原微调</button>
+        <p class="status-line" id="status-line" role="status">示例预览 · 轻点照片选择你的照片</p>
       </section>
     </main>
   </body>

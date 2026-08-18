@@ -26,13 +26,9 @@ const state = {
 
 const elements = {
   canvas: document.querySelector("#preview"),
-  filmMark: document.querySelector("#film-mark"),
   compareButton: document.querySelector("#compare-button"),
   photoCount: document.querySelector("#photo-count"),
-  thumbnailRow: document.querySelector("#thumbnail-row"),
   input: document.querySelector("#photo-input"),
-  uploadCopy: document.querySelector("#upload-copy"),
-  removeButton: document.querySelector("#remove-button"),
   resetButton: document.querySelector("#reset-button"),
   exportButton: document.querySelector("#export-button"),
   exportCopy: document.querySelector("#export-copy"),
@@ -211,37 +207,13 @@ async function loadPreview() {
 
 function updatePhotoControls() {
   const hasPhotos = state.photos.length > 0;
-  elements.uploadCopy.textContent = hasPhotos ? "继续添加照片" : "选择手机照片";
-  elements.removeButton.hidden = !hasPhotos;
-  elements.thumbnailRow.hidden = !hasPhotos;
-  elements.photoCount.hidden = !hasPhotos;
-  elements.photoCount.textContent = hasPhotos ? `${state.activeIndex + 1} / ${state.photos.length}` : "";
+  elements.photoCount.textContent = hasPhotos ? `${state.activeIndex + 1} / ${state.photos.length}` : "轻点选照片";
+  elements.photoCount.setAttribute("aria-label", hasPhotos && state.photos.length > 1 ? "查看下一张照片" : "选择手机照片");
   elements.exportCopy.textContent = state.busy
     ? "正在处理…"
     : state.photos.length > 1
-      ? `保存 / 分享 ${state.photos.length} 张`
-      : "保存 / 分享照片";
-}
-
-function renderThumbnails() {
-  elements.thumbnailRow.replaceChildren();
-  state.photos.forEach((photo, index) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.classList.toggle("active", index === state.activeIndex);
-    button.setAttribute("aria-label", `查看第 ${index + 1} 张照片`);
-    const image = document.createElement("img");
-    image.src = photo.url;
-    image.alt = "";
-    button.append(image);
-    button.addEventListener("click", () => {
-      state.activeIndex = index;
-      renderThumbnails();
-      updatePhotoControls();
-      loadPreview();
-    });
-    elements.thumbnailRow.append(button);
-  });
+      ? `保存 ${state.photos.length} 张照片`
+      : "保存照片";
 }
 
 function addPhotos(files) {
@@ -257,7 +229,6 @@ function addPhotos(files) {
     const hadPhotos = state.photos.length > 0;
     state.photos.push(...accepted);
     if (!hadPhotos) state.activeIndex = 0;
-    renderThumbnails();
     updatePhotoControls();
     loadPreview();
     setStatus(
@@ -268,23 +239,23 @@ function addPhotos(files) {
   }
 }
 
-function removeActivePhoto() {
-  if (!state.photos.length) return;
-  const [removed] = state.photos.splice(state.activeIndex, 1);
-  URL.revokeObjectURL(removed.url);
-  state.activeIndex = Math.max(0, Math.min(state.activeIndex, state.photos.length - 1));
-  renderThumbnails();
+function showNextPhoto() {
+  if (!state.photos.length) {
+    elements.input.click();
+    return;
+  }
+  if (state.photos.length > 1) state.activeIndex = (state.activeIndex + 1) % state.photos.length;
   updatePhotoControls();
   loadPreview();
-  setStatus(state.photos.length ? `还剩 ${state.photos.length} 张照片` : "示例预览 · 请选择你的照片");
 }
 
 function chooseFilter(filter) {
   state.activeFilter = filter;
   state.grain = FILTERS[filter].defaultGrain;
-  elements.filmMark.textContent = FILTERS[filter].name;
   elements.filters.forEach((button) => {
-    button.classList.toggle("active", button.dataset.filter === filter);
+    const active = button.dataset.filter === filter;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
   });
   updateSlider("grain");
   drawPreview();
@@ -394,7 +365,7 @@ elements.input.addEventListener("change", (event) => {
   addPhotos(event.target.files || []);
   event.target.value = "";
 });
-elements.removeButton.addEventListener("click", removeActivePhoto);
+elements.photoCount.addEventListener("click", showNextPhoto);
 elements.resetButton.addEventListener("click", resetAdjustments);
 elements.exportButton.addEventListener("click", exportPhotos);
 elements.filters.forEach((button) => {

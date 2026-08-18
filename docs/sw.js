@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "s-film-static-v3";
+const CACHE_NAME = "s-film-static-v4";
 const ROOT = new URL("./", self.registration.scope).href;
 const APP_SHELL = [
   ROOT,

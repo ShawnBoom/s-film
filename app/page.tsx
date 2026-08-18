@@ -190,27 +190,13 @@ export default function Home() {
     event.target.value = "";
   };
 
-  const removeActivePhoto = () => {
-    if (!photos.length) return;
-    const target = photos[activeIndex];
-    URL.revokeObjectURL(target.url);
-    objectUrlsRef.current = objectUrlsRef.current.filter((url) => url !== target.url);
-    const next = photos.filter((_, index) => index !== activeIndex);
-    setPhotos(next);
-    setActiveIndex(Math.max(0, Math.min(activeIndex, next.length - 1)));
-    setStatus(next.length ? `还剩 ${next.length} 张照片` : "示例预览 · 请选择你的照片");
+  const showNextPhoto = () => {
+    if (photos.length > 1) setActiveIndex((index) => (index + 1) % photos.length);
   };
 
   const chooseFilter = (id: FilterId) => {
     setActiveFilter(id);
     setGrain(FILTERS.find((item) => item.id === id)?.defaultGrain ?? 8);
-  };
-
-  const resetAdjustments = () => {
-    setStrength(72);
-    setBrightness(0);
-    setColor(0);
-    setGrain(FILTERS.find((item) => item.id === activeFilter)?.defaultGrain ?? 8);
   };
 
   const processPhoto = useCallback(async (photo: PhotoItem) => {
@@ -345,82 +331,53 @@ export default function Home() {
         <div className="privacy-pill"><span /> 照片仅在本机处理</div>
       </header>
 
-      <section className="workspace">
-        <div className="photo-stage">
-          <div className="photo-frame">
-            <canvas ref={canvasRef} aria-label="滤镜实时预览" />
-            <div className="film-mark">{selectedName}</div>
-            <button
-              type="button"
-              className="compare-button"
-              onPointerDown={() => setComparing(true)}
-              onPointerUp={() => setComparing(false)}
-              onPointerCancel={() => setComparing(false)}
-              onPointerLeave={() => setComparing(false)}
-              onKeyDown={compareKeyDown}
-              onKeyUp={() => setComparing(false)}
-            >
-              按住看原图
+      <section className="editor">
+        <div className="photo-frame">
+          <canvas ref={canvasRef} aria-label="滤镜实时预览" />
+          <label className="photo-picker" aria-label={photos.length ? "继续添加照片" : "选择手机照片"}>
+            <input type="file" accept="image/*" multiple onChange={handleFiles} />
+          </label>
+          <button
+            type="button"
+            className="compare-button"
+            onPointerDown={() => setComparing(true)}
+            onPointerUp={() => setComparing(false)}
+            onPointerCancel={() => setComparing(false)}
+            onPointerLeave={() => setComparing(false)}
+            onKeyDown={compareKeyDown}
+            onKeyUp={() => setComparing(false)}
+          >
+            按住看原图
+          </button>
+          {photos.length ? (
+            <button type="button" className="photo-count" onClick={showNextPhoto} aria-label={photos.length > 1 ? "查看下一张照片" : "已选择一张照片"}>
+              {activeIndex + 1} / {photos.length}
             </button>
-            {photos.length > 0 && <div className="photo-count">{activeIndex + 1} / {photos.length}</div>}
-          </div>
+          ) : (
+            <span className="photo-count photo-count-label">轻点选照片</span>
+          )}
         </div>
 
-        <div className="controls-panel">
-          {photos.length > 0 && (
-            <div className="thumbnail-row" aria-label="已选照片">
-              {photos.map((photo, index) => (
-                <button
-                  type="button"
-                  key={photo.id}
-                  className={index === activeIndex ? "active" : ""}
-                  onClick={() => setActiveIndex(index)}
-                  aria-label={`查看第 ${index + 1} 张照片`}
-                >
-                  {/* Blob previews cannot use the framework image optimizer. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.url} alt="" />
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="photo-actions">
-            <label className="upload-button">
-              <span className="plus">＋</span>
-              {photos.length ? "继续添加照片" : "选择手机照片"}
-              <input type="file" accept="image/*" multiple onChange={handleFiles} />
-            </label>
-            {photos.length > 0 && (
-              <button type="button" className="remove-button" onClick={removeActivePhoto}>移除当前</button>
-            )}
-          </div>
-          <p className="upload-hint">可一次选择多张 · 原图不会被修改 · 最多 {MAX_PHOTOS} 张</p>
-
-          <div className="section-heading filter-heading">
-            <h2>滤镜</h2>
-            <span>选择一种感觉</span>
-          </div>
-
-          <div className="filter-list">
-            {FILTERS.map((filter, index) => (
+        <div className="filter-strip" aria-label="选择滤镜">
+          {FILTERS.map((filter) => {
+            const [brand, ...nameParts] = filter.name.split(" ");
+            return (
               <button
                 key={filter.id}
                 type="button"
-                className={`filter-card ${activeFilter === filter.id ? "active" : ""}`}
+                className={activeFilter === filter.id ? "active" : ""}
+                aria-pressed={activeFilter === filter.id}
+                aria-label={filter.name}
                 onClick={() => chooseFilter(filter.id)}
               >
-                <span className="filter-number">0{index + 1}</span>
-                <strong>{filter.name}</strong>
+                <strong>{nameParts.join(" ")}</strong>
+                <span>{brand}</span>
               </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
-          <div className="adjustments-heading">
-            <h2>微调</h2>
-            <button type="button" onClick={resetAdjustments}>还原</button>
-          </div>
-
+        <div className="adjustments">
           <div className="adjustment-tabs" role="tablist" aria-label="微调项目">
             {(Object.keys(adjustmentControls) as AdjustmentId[]).map((id) => (
               <button
@@ -451,14 +408,13 @@ export default function Home() {
               style={rangeStyle(currentAdjustment.progress)}
             />
           </div>
-
-          <button className="primary-button" type="button" onClick={exportPhotos} disabled={busy}>
-            <span>{busy ? "正在处理…" : photos.length > 1 ? `保存 / 分享 ${photos.length} 张` : "保存 / 分享照片"}</span>
-            <span aria-hidden="true">→</span>
-          </button>
-          <p className="status-line" role="status">{status}</p>
-          <p className="local-note">所有滤镜计算都在当前设备完成，照片不会发送到服务器。</p>
         </div>
+
+        <button className="primary-button" type="button" onClick={exportPhotos} disabled={busy}>
+          <span>{busy ? "正在处理…" : photos.length > 1 ? `保存 ${photos.length} 张照片` : "保存照片"}</span>
+          <span aria-hidden="true">→</span>
+        </button>
+        <p className="status-line" role="status">{status}</p>
       </section>
     </main>
   );
