@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "s-film-static-v1";
+const CACHE_NAME = "s-film-static-v2";
 const ROOT = new URL("./", self.registration.scope).href;
 const APP_SHELL = [
   ROOT,
@@ -9,6 +9,8 @@ const APP_SHELL = [
   new URL("./app.js", ROOT).href,
   new URL("./manifest.webmanifest", ROOT).href,
   new URL("./sample-neutral.png", ROOT).href,
+  new URL("./s-film-social.png", ROOT).href,
+  new URL("./og.png", ROOT).href,
 ];
 
 self.addEventListener("install", (event) => {

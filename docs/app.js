@@ -26,6 +26,7 @@ const state = {
 const elements = {
   canvas: document.querySelector("#preview"),
   filmMark: document.querySelector("#film-mark"),
+  heroUpload: document.querySelector("#hero-upload"),
   compareButton: document.querySelector("#compare-button"),
   photoCount: document.querySelector("#photo-count"),
   thumbnailRow: document.querySelector("#thumbnail-row"),
@@ -279,6 +280,7 @@ function removeActivePhoto() {
 function chooseFilter(filter) {
   state.activeFilter = filter;
   state.grain = FILTERS[filter].defaultGrain;
+  document.documentElement.dataset.filter = filter;
   elements.filmMark.textContent = FILTERS[filter].name;
   elements.filters.forEach((button) => {
     button.classList.toggle("active", button.dataset.filter === filter);
@@ -379,6 +381,7 @@ elements.input.addEventListener("change", (event) => {
   addPhotos(event.target.files || []);
   event.target.value = "";
 });
+elements.heroUpload.addEventListener("click", () => elements.input.click());
 elements.removeButton.addEventListener("click", removeActivePhoto);
 elements.resetButton.addEventListener("click", resetAdjustments);
 elements.exportButton.addEventListener("click", exportPhotos);
