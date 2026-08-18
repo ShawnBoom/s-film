@@ -216,7 +216,7 @@ export default function Home() {
     context.putImageData(frame, 0, 0);
     const blob = await canvasBlob(canvas);
     const baseName = photo.file.name.replace(/\.[^.]+$/, "") || "photo";
-    return new File([blob], `${baseName}-s-film.jpg`, { type: "image/jpeg" });
+    return new File([blob], `${baseName}-see.jpg`, { type: "image/jpeg" });
   }, [activeFilter, brightness, color, grain, strength]);
 
   const downloadFiles = async (files: File[]) => {
@@ -247,7 +247,7 @@ export default function Home() {
         files.push(await processPhoto(photos[index]));
       }
 
-      const shareData = { files, title: "S Film", text: `使用 ${selectedName} 处理` };
+      const shareData = { files, title: "See", text: `使用 ${selectedName} 处理` };
       const canShare = typeof navigator.share === "function"
         && (typeof navigator.canShare !== "function" || navigator.canShare(shareData));
 
@@ -327,7 +327,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand">S FILM</div>
+        <div className="brand">See</div>
         <div className="privacy-pill"><span /> 照片仅在本机处理</div>
       </header>
 

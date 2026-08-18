@@ -1,13 +1,20 @@
 "use strict";
 
-const CACHE_NAME = "s-film-static-v5";
+const CACHE_NAME = "s-film-static-v6";
 const ROOT = new URL("./", self.registration.scope).href;
 const APP_SHELL = [
   ROOT,
   new URL("./index.html", ROOT).href,
   new URL("./styles.css?v=5", ROOT).href,
-  new URL("./app.js?v=5", ROOT).href,
-  new URL("./manifest.webmanifest", ROOT).href,
+  new URL("./app.js?v=6", ROOT).href,
+  new URL("./manifest.webmanifest?v=6", ROOT).href,
+  new URL("./apple-touch-icon.png", ROOT).href,
+  new URL("./icons/apple-touch-icon-120.png", ROOT).href,
+  new URL("./icons/apple-touch-icon-152.png", ROOT).href,
+  new URL("./icons/apple-touch-icon-167.png", ROOT).href,
+  new URL("./icons/apple-touch-icon-180.png", ROOT).href,
+  new URL("./icons/icon-192.png", ROOT).href,
+  new URL("./icons/icon-512.png", ROOT).href,
   new URL("./sample-neutral.png", ROOT).href,
   new URL("./s-film-social.png", ROOT).href,
   new URL("./og.png", ROOT).href,

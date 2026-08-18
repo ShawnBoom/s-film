@@ -11,23 +11,35 @@ export async function generateMetadata(): Promise<Metadata> {
   const socialImage = `${origin}/og.png`;
 
   return {
-    title: "S Film｜手机胶片滤镜",
+    title: "See｜手机胶片滤镜",
     description: "不登录、不上传，在手机本地为照片添加胶片质感。",
-    applicationName: "S Film",
+    applicationName: "See",
     manifest: "/manifest.webmanifest",
+    icons: {
+      icon: [
+        { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+        { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+      apple: [
+        { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+        { url: "/icons/apple-touch-icon-167.png", sizes: "167x167", type: "image/png" },
+        { url: "/icons/apple-touch-icon-152.png", sizes: "152x152", type: "image/png" },
+        { url: "/icons/apple-touch-icon-120.png", sizes: "120x120", type: "image/png" },
+      ],
+    },
     appleWebApp: {
       capable: true,
-      title: "S Film",
+      title: "See",
       statusBarStyle: "black-translucent",
     },
     openGraph: {
-      title: "S Film｜手机胶片滤镜",
+      title: "See｜手机胶片滤镜",
       description: "不登录、不上传，在手机本地为照片添加胶片质感。",
-      images: [{ url: socialImage, width: 1731, height: 909, alt: "S Film" }],
+      images: [{ url: socialImage, width: 1731, height: 909, alt: "See" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "S Film｜手机胶片滤镜",
+      title: "See｜手机胶片滤镜",
       description: "不登录、不上传，在手机本地为照片添加胶片质感。",
       images: [socialImage],
     },

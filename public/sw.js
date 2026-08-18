@@ -1,5 +1,17 @@
-const CACHE_NAME = "s-film-v4";
-const APP_SHELL = ["/", "/sample-neutral.png", "/og.png"];
+const CACHE_NAME = "s-film-v5";
+const APP_SHELL = [
+  "/",
+  "/manifest.webmanifest",
+  "/apple-touch-icon.png",
+  "/icons/apple-touch-icon-120.png",
+  "/icons/apple-touch-icon-152.png",
+  "/icons/apple-touch-icon-167.png",
+  "/icons/apple-touch-icon-180.png",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/sample-neutral.png",
+  "/og.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -33,7 +45,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (["script", "style", "image", "font"].includes(request.destination)) {
+  if (["script", "style", "image", "font", "manifest"].includes(request.destination)) {
     event.respondWith(
       caches.match(request).then((cached) => cached || fetch(request).then((response) => {
         const copy = response.clone();

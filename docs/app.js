@@ -299,7 +299,7 @@ async function processPhoto(photo) {
   context.putImageData(frame, 0, 0);
   const blob = await canvasBlob(canvas);
   const baseName = photo.file.name.replace(/\.[^.]+$/, "") || "photo";
-  return new File([blob], `${baseName}-s-film.jpg`, { type: "image/jpeg" });
+  return new File([blob], `${baseName}-see.jpg`, { type: "image/jpeg" });
 }
 
 async function downloadFiles(files) {
@@ -332,7 +332,7 @@ async function exportPhotos() {
       files.push(await processPhoto(state.photos[index]));
     }
 
-    const shareData = { files, title: "S Film", text: `使用 ${FILTERS[state.activeFilter].name} 处理` };
+    const shareData = { files, title: "See", text: `使用 ${FILTERS[state.activeFilter].name} 处理` };
     const canShare = typeof navigator.share === "function"
       && (typeof navigator.canShare !== "function" || navigator.canShare(shareData));
 
@@ -407,7 +407,7 @@ window.addEventListener("pagehide", () => {
 });
 
 if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("./sw.js?v=5").catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=6").catch(() => {});
 }
 
 updateAllSliders();
