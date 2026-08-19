@@ -5,11 +5,14 @@
   --muted: #71726c;
   --line: rgba(23, 24, 22, 0.16);
   --panel: #e8e5dc;
-  --accent: #4f8a63;
+  --accent: #ffc926;
+  --privacy-dot: #d52518;
+  --control-surface: #f3e8cc;
+  --control-ink: #171816;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root { --paper: #1b1c1a; --ink: #f1f0ea; --muted: #aaa9a2; --line: rgba(241, 240, 234, 0.18); --panel: #242522; --accent: #55d58c; }
+  :root { --paper: #1b1c1a; --ink: #f1f0ea; --muted: #aaa9a2; --line: rgba(241, 240, 234, 0.18); --panel: #242522; --accent: #ffc926; --privacy-dot: #d52518; --control-surface: #f3e8cc; --control-ink: #171816; }
 }
 
 * { box-sizing: border-box; }
@@ -25,7 +28,7 @@ button:focus-visible, input:focus-visible, label:has(input:focus-visible) { outl
 .brand { display: flex; align-items: center; min-width: 44px; }
 .brand img { display: block; width: auto; height: 19px; }
 .privacy-pill { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
-.privacy-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.privacy-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--privacy-dot); }
 
 .editor { position: relative; }
 .photo-frame { position: relative; display: grid; place-items: center; overflow: hidden; width: 100%; height: clamp(220px, calc(100vh - 302px), 480px); height: clamp(220px, calc(100dvh - 302px), 480px); background: var(--panel); }
@@ -37,7 +40,7 @@ button:focus-visible, input:focus-visible, label:has(input:focus-visible) { outl
 .photo-count { right: 12px; cursor: pointer; }
 
 .filter-strip { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); }
-.filter-strip button { min-height: 62px; padding: 9px 5px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; line-height: 1.45; }
+.filter-strip button { display: grid; place-items: center; min-height: 62px; padding: 9px 5px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; line-height: 1.45; }
 .filter-strip button:last-child { border-right: 0; }
 .filter-strip strong { display: block; color: var(--ink); font-size: 12px; font-weight: 400; }
 .filter-strip button.active { background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 -3px 0 var(--accent); }
@@ -45,7 +48,7 @@ button:focus-visible, input:focus-visible, label:has(input:focus-visible) { outl
 .adjustments { padding: 12px 14px 14px; }
 .adjustment-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .adjustment-tabs button { min-height: 34px; padding: 5px 2px; border: 0; border-radius: 17px; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; }
-.adjustment-tabs button.active { background: var(--ink); color: var(--paper); }
+.adjustment-tabs button.active { background: var(--control-surface); color: var(--control-ink); }
 .adjustment-list { padding-top: 14px; }
 .slider-control { display: none; }
 .slider-control.active { display: block; }
@@ -55,7 +58,7 @@ input[type="range"] { width: 100%; height: 20px; margin: 0; appearance: none; ba
 input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: linear-gradient(to right, var(--accent) 0 var(--range-progress), #777a76 var(--range-progress) 100%); }
 input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6px; appearance: none; border: 0; border-radius: 50%; background: var(--accent); }
 
-.primary-button { display: flex; align-items: center; justify-content: space-between; width: calc(100% - 28px); min-height: 52px; margin: 0 14px 16px; padding: 0 17px; border: 0; background: var(--ink); color: var(--paper); cursor: pointer; font-size: 13px; }
+.primary-button { display: flex; align-items: center; justify-content: space-between; width: calc(100% - 28px); min-height: 52px; margin: 0 14px 16px; padding: 0 17px; border: 0; background: var(--control-surface); color: var(--control-ink); cursor: pointer; font-size: 13px; }
 .primary-button:disabled { opacity: 0.65; cursor: wait; }
 .primary-button span:last-child { font-size: 20px; }
 .reset-button { display: none; }

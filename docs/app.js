@@ -407,7 +407,7 @@ window.addEventListener("pagehide", () => {
 });
 
 if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("./sw.js?v=7").catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=8").catch(() => {});
 }
 
 updateAllSliders();

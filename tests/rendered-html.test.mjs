@@ -26,6 +26,9 @@ test("server-renders the See experience", async () => {
   assert.match(html, /FUJI Classic Chrome/);
   assert.match(html, /KODAK Gold 200/);
   assert.match(html, /FUJI Youth Blue/);
+  assert.match(html, /#S01/);
+  assert.match(html, /#S02/);
+  assert.match(html, /#S03/);
   assert.match(html, /照片仅在本机处理/);
   assert.match(html, /选择手机照片/);
 });
@@ -108,5 +111,27 @@ test("preserves the supplied logo and cover image bytes", async () => {
   for (const [path, expectedHash] of assets) {
     const bytes = await readFile(new URL(path, import.meta.url));
     assert.equal(createHash("sha256").update(bytes).digest("hex"), expectedHash, path);
+  }
+});
+
+test("uses the requested filter labels and interface colors", async () => {
+  const [page, appStyles, staticHtml, staticStyles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../docs/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../docs/styles.css", import.meta.url), "utf8"),
+  ]);
+
+  for (const label of ["#S01", "#S02", "#S03"]) {
+    assert.match(page, new RegExp(label));
+    assert.match(staticHtml, new RegExp(label));
+  }
+  for (const styles of [appStyles, staticStyles]) {
+    assert.match(styles, /--accent:\s*#ffc926/i);
+    assert.match(styles, /--privacy-dot:\s*#d52518/i);
+    assert.match(styles, /--control-surface:\s*#f3e8cc/i);
+    assert.match(styles, /background:\s*var\(--privacy-dot\)/);
+    assert.match(styles, /\.adjustment-tabs button\.active\s*\{[^}]*background:\s*var\(--control-surface\)/s);
+    assert.match(styles, /\.primary-button\s*\{[^}]*background:\s*var\(--control-surface\)/s);
   }
 });

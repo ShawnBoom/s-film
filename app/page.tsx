@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties, KeyboardEvent } from "react";
 
 const FILTERS = [
-  { id: "classic", name: "FUJI Classic Chrome", note: "克制 · 青灰 · 安静", defaultGrain: 8 },
-  { id: "gold", name: "KODAK Gold 200", note: "暖阳 · 鲜活 · 怀旧", defaultGrain: 11 },
-  { id: "youth", name: "FUJI Youth Blue", note: "蓝天 · 街头 · 自由", defaultGrain: 7 },
+  { id: "classic", label: "#S01", name: "FUJI Classic Chrome", note: "克制 · 青灰 · 安静", defaultGrain: 8 },
+  { id: "gold", label: "#S02", name: "KODAK Gold 200", note: "暖阳 · 鲜活 · 怀旧", defaultGrain: 11 },
+  { id: "youth", label: "#S03", name: "FUJI Youth Blue", note: "蓝天 · 街头 · 自由", defaultGrain: 7 },
 ] as const;
 
 type FilterId = (typeof FILTERS)[number]["id"];
@@ -361,22 +361,18 @@ export default function Home() {
         </div>
 
         <div className="filter-strip" aria-label="选择滤镜">
-          {FILTERS.map((filter) => {
-            const [brand, ...nameParts] = filter.name.split(" ");
-            return (
-              <button
-                key={filter.id}
-                type="button"
-                className={activeFilter === filter.id ? "active" : ""}
-                aria-pressed={activeFilter === filter.id}
-                aria-label={filter.name}
-                onClick={() => chooseFilter(filter.id)}
-              >
-                <strong>{nameParts.join(" ")}</strong>
-                <span>{brand}</span>
-              </button>
-            );
-          })}
+          {FILTERS.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              className={activeFilter === filter.id ? "active" : ""}
+              aria-pressed={activeFilter === filter.id}
+              aria-label={`${filter.label}，${filter.name}`}
+              onClick={() => chooseFilter(filter.id)}
+            >
+              <strong>{filter.label}</strong>
+            </button>
+          ))}
         </div>
 
         <div className="adjustments">

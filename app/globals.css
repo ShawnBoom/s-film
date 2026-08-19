@@ -7,7 +7,10 @@
   --muted: #71726c;
   --line: rgba(23, 24, 22, 0.16);
   --panel: #e8e5dc;
-  --accent: #4f8a63;
+  --accent: #ffc926;
+  --privacy-dot: #d52518;
+  --control-surface: #f3e8cc;
+  --control-ink: #171816;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,7 +20,10 @@
     --muted: #aaa9a2;
     --line: rgba(241, 240, 234, 0.18);
     --panel: #242522;
-    --accent: #55d58c;
+    --accent: #ffc926;
+    --privacy-dot: #d52518;
+    --control-surface: #f3e8cc;
+    --control-ink: #171816;
   }
 }
 
@@ -58,7 +64,7 @@ button:focus-visible, input:focus-visible, label:has(input:focus-visible) { outl
 .brand { display: flex; align-items: center; min-width: 44px; }
 .brand img { display: block; width: auto; height: 19px; }
 .privacy-pill { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
-.privacy-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.privacy-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--privacy-dot); }
 
 .editor { position: relative; }
 .photo-frame {
@@ -93,6 +99,8 @@ button:focus-visible, input:focus-visible, label:has(input:focus-visible) { outl
 
 .filter-strip { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); }
 .filter-strip button {
+  display: grid;
+  place-items: center;
   min-height: 62px;
   padding: 9px 5px;
   border: 0;
@@ -119,7 +127,7 @@ button:focus-visible, input:focus-visible, label:has(input:focus-visible) { outl
   cursor: pointer;
   font-size: 11px;
 }
-.adjustment-tabs button.active { background: var(--ink); color: var(--paper); }
+.adjustment-tabs button.active { background: var(--control-surface); color: var(--control-ink); }
 .adjustment-control { padding-top: 14px; }
 .control-label { display: flex; align-items: baseline; justify-content: space-between; margin: 0 2px 8px; font-size: 12px; }
 .control-label strong { color: var(--muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
@@ -136,8 +144,8 @@ input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; margin-to
   margin: 0 14px 16px;
   padding: 0 17px;
   border: 0;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--control-surface);
+  color: var(--control-ink);
   cursor: pointer;
   font-size: 13px;
 }
