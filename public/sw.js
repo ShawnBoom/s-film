@@ -1,15 +1,16 @@
-const CACHE_NAME = "s-film-v5";
+const CACHE_NAME = "s-film-v6";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
   "/apple-touch-icon.png",
-  "/icons/apple-touch-icon-120.png",
-  "/icons/apple-touch-icon-152.png",
-  "/icons/apple-touch-icon-167.png",
-  "/icons/apple-touch-icon-180.png",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/sample-neutral.png",
+  "/icons/see-apple-touch-icon-120.png",
+  "/icons/see-apple-touch-icon-152.png",
+  "/icons/see-apple-touch-icon-167.png",
+  "/icons/see-apple-touch-icon-180.png",
+  "/icons/see-icon-192.png",
+  "/icons/see-icon-512.png",
+  "/see-logo.png",
+  "/see-cover.png",
   "/og.png",
 ];
 

@@ -177,7 +177,7 @@ function drawPreview() {
   if (!context) return;
   const frame = context.createImageData(state.sourceData.width, state.sourceData.height);
   frame.data.set(
-    state.comparing
+    state.comparing || !state.photos.length
       ? state.sourceData.data
       : processPixels(state.sourceData, state.activeFilter, settings()),
   );
@@ -185,7 +185,7 @@ function drawPreview() {
 }
 
 async function loadPreview() {
-  const sourceUrl = state.photos[state.activeIndex]?.url || "./sample-neutral.png";
+  const sourceUrl = state.photos[state.activeIndex]?.url || "./see-cover.png";
   try {
     const image = await loadImage(sourceUrl);
     const scale = Math.min(1, PREVIEW_LONG_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
@@ -407,7 +407,7 @@ window.addEventListener("pagehide", () => {
 });
 
 if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("./sw.js?v=6").catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=7").catch(() => {});
 }
 
 updateAllSliders();

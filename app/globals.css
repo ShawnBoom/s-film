@@ -55,7 +55,8 @@ button:focus-visible, input:focus-visible, label:has(input:focus-visible) { outl
   padding: 0 16px;
   border-bottom: 1px solid var(--line);
 }
-.brand { font-size: 12px; font-weight: 500; letter-spacing: 0.14em; }
+.brand { display: flex; align-items: center; min-width: 44px; }
+.brand img { display: block; width: auto; height: 19px; }
 .privacy-pill { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
 .privacy-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 

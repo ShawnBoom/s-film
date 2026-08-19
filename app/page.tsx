@@ -122,7 +122,7 @@ export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sourceDataRef = useRef<ImageData | null>(null);
   const objectUrlsRef = useRef<string[]>([]);
-  const sourceUrl = photos[activeIndex]?.url ?? "/sample-neutral.png";
+  const sourceUrl = photos[activeIndex]?.url ?? "/see-cover.png";
   const selectedName = FILTERS.find((item) => item.id === activeFilter)?.name;
 
   useEffect(() => {
@@ -161,12 +161,12 @@ export default function Home() {
     if (!context) return;
     const frame = context.createImageData(source.width, source.height);
     frame.data.set(
-      comparing
+      comparing || photos.length === 0
         ? source.data
         : processPixels(source, activeFilter, { strength, brightness, color, grain }),
     );
     context.putImageData(frame, 0, 0);
-  }, [activeFilter, brightness, color, comparing, grain, sourceVersion, strength]);
+  }, [activeFilter, brightness, color, comparing, grain, photos.length, sourceVersion, strength]);
 
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
@@ -327,7 +327,9 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand">See</div>
+        <div className="brand">
+          <img src="/see-logo.png" width="1306" height="591" alt="See" />
+        </div>
         <div className="privacy-pill"><span /> 照片仅在本机处理</div>
       </header>
 

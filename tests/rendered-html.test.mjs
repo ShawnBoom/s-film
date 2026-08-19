@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -20,7 +21,8 @@ test("server-renders the See experience", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, />See</);
+  assert.match(html, /src="\/see-logo\.png"/);
+  assert.match(html, /alt="See"/);
   assert.match(html, /FUJI Classic Chrome/);
   assert.match(html, /KODAK Gold 200/);
   assert.match(html, /FUJI Youth Blue/);
@@ -36,6 +38,8 @@ test("keeps photo processing local and batch-capable", async () => {
   ]);
 
   assert.match(page, /processPixels/);
+  assert.match(page, /\/see-cover\.png/);
+  assert.match(page, /comparing \|\| photos\.length === 0/);
   assert.match(page, /type="file"[^>]*multiple/);
   assert.match(page, /navigator\.share/);
   assert.match(page, /MAX_PHOTOS = 20/);
@@ -56,13 +60,13 @@ test("ships the requested iOS and PWA app icons", async () => {
 
   assert.match(layout, /apple-touch-icon\.png/);
   assert.match(layout, /applicationName:\s*"See"/);
-  assert.match(appManifest, /icon-192\.png/);
-  assert.match(appManifest, /icon-512\.png/);
+  assert.match(appManifest, /see-icon-192\.png/);
+  assert.match(appManifest, /see-icon-512\.png/);
   assert.match(appManifest, /short_name:\s*"See"/);
-  assert.match(staticHtml, /apple-touch-icon-120\.png/);
-  assert.match(staticHtml, /apple-touch-icon-152\.png/);
-  assert.match(staticHtml, /apple-touch-icon-167\.png/);
-  assert.match(staticHtml, /apple-touch-icon-180\.png/);
+  assert.match(staticHtml, /see-apple-touch-icon-120\.png/);
+  assert.match(staticHtml, /see-apple-touch-icon-152\.png/);
+  assert.match(staticHtml, /see-apple-touch-icon-167\.png/);
+  assert.match(staticHtml, /see-apple-touch-icon-180\.png/);
   assert.match(staticHtml, /apple-mobile-web-app-title" content="See"/);
   assert.equal(staticManifest.name, "See");
   assert.equal(staticManifest.short_name, "See");
@@ -70,19 +74,19 @@ test("ships the requested iOS and PWA app icons", async () => {
 
   const icons = [
     ["../public/apple-touch-icon.png", 180],
-    ["../public/icons/apple-touch-icon-120.png", 120],
-    ["../public/icons/apple-touch-icon-152.png", 152],
-    ["../public/icons/apple-touch-icon-167.png", 167],
-    ["../public/icons/apple-touch-icon-180.png", 180],
-    ["../public/icons/icon-192.png", 192],
-    ["../public/icons/icon-512.png", 512],
+    ["../public/icons/see-apple-touch-icon-120.png", 120],
+    ["../public/icons/see-apple-touch-icon-152.png", 152],
+    ["../public/icons/see-apple-touch-icon-167.png", 167],
+    ["../public/icons/see-apple-touch-icon-180.png", 180],
+    ["../public/icons/see-icon-192.png", 192],
+    ["../public/icons/see-icon-512.png", 512],
     ["../docs/apple-touch-icon.png", 180],
-    ["../docs/icons/apple-touch-icon-120.png", 120],
-    ["../docs/icons/apple-touch-icon-152.png", 152],
-    ["../docs/icons/apple-touch-icon-167.png", 167],
-    ["../docs/icons/apple-touch-icon-180.png", 180],
-    ["../docs/icons/icon-192.png", 192],
-    ["../docs/icons/icon-512.png", 512],
+    ["../docs/icons/see-apple-touch-icon-120.png", 120],
+    ["../docs/icons/see-apple-touch-icon-152.png", 152],
+    ["../docs/icons/see-apple-touch-icon-167.png", 167],
+    ["../docs/icons/see-apple-touch-icon-180.png", 180],
+    ["../docs/icons/see-icon-192.png", 192],
+    ["../docs/icons/see-icon-512.png", 512],
   ];
 
   for (const [path, size] of icons) {
@@ -90,5 +94,19 @@ test("ships the requested iOS and PWA app icons", async () => {
     assert.equal(png.subarray(1, 4).toString("ascii"), "PNG", path);
     assert.equal(png.readUInt32BE(16), size, `${path} width`);
     assert.equal(png.readUInt32BE(20), size, `${path} height`);
+  }
+});
+
+test("preserves the supplied logo and cover image bytes", async () => {
+  const assets = [
+    ["../public/see-logo.png", "e7d3f9b0e02fa8fc70d8c3ca8624b0a50b76b06967cd3e2958b9fb0a541b597a"],
+    ["../docs/see-logo.png", "e7d3f9b0e02fa8fc70d8c3ca8624b0a50b76b06967cd3e2958b9fb0a541b597a"],
+    ["../public/see-cover.png", "9b326205899b9e9f55c98a1f0a5e5083d4195a5e634a8cc234056033c2028b54"],
+    ["../docs/see-cover.png", "9b326205899b9e9f55c98a1f0a5e5083d4195a5e634a8cc234056033c2028b54"],
+  ];
+
+  for (const [path, expectedHash] of assets) {
+    const bytes = await readFile(new URL(path, import.meta.url));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), expectedHash, path);
   }
 });
