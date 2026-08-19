@@ -14,7 +14,7 @@ const state = {
   photos: [],
   activeIndex: 0,
   activeFilter: "classic",
-  strength: 72,
+  strength: 100,
   brightness: 0,
   color: 0,
   grain: 8,
@@ -274,7 +274,7 @@ function chooseAdjustment(adjustment) {
 }
 
 function resetAdjustments() {
-  state.strength = 72;
+  state.strength = 100;
   state.brightness = 0;
   state.color = 0;
   state.grain = FILTERS[state.activeFilter].defaultGrain;

@@ -109,7 +109,7 @@ export default function Home() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeFilter, setActiveFilter] = useState<FilterId>("classic");
-  const [strength, setStrength] = useState(72);
+  const [strength, setStrength] = useState(100);
   const [brightness, setBrightness] = useState(0);
   const [color, setColor] = useState(0);
   const [grain, setGrain] = useState(8);

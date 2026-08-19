@@ -43,6 +43,7 @@ test("keeps photo processing local and batch-capable", async () => {
   assert.match(page, /processPixels/);
   assert.match(page, /\/see-cover\.png/);
   assert.match(page, /comparing \|\| photos\.length === 0/);
+  assert.match(page, /useState\(100\)/);
   assert.match(page, /type="file"[^>]*multiple/);
   assert.match(page, /navigator\.share/);
   assert.match(page, /MAX_PHOTOS = 20/);
