@@ -199,11 +199,13 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=31"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=31"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=31"/);
-  assert.match(staticWorker, /see-static-v31/);
-  assert.match(staticWorker, /image-engine\.js\?v=31/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=33"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=33"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=33"/);
+  assert.match(staticWorker, /see-static-v33/);
+  assert.match(staticWorker, /image-engine\.js\?v=33/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=33/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=33/);
   assert.match(staticWorker, /see-welcome\.png/);
   assert.match(appWorker, /see-v21/);
   assert.match(appWorker, /see-welcome\.png/);

@@ -1,3 +1,6 @@
+import { S01_LUT, S01_LUT_SIZE } from "./s01-classic-neg-lut.js?v=33";
+import { S02_LUT, S02_LUT_SIZE } from "./s02-classic-chrome-lut.js?v=33";
+
 const SRGB_TO_LINEAR = Array.from({ length: 256 }, (_, value) => {
   const channel = value / 255;
   return channel <= 0.04045
@@ -25,21 +28,61 @@ function saturation(r, g, b, amount) {
   ];
 }
 
+function lutIndex(size, r, g, b) {
+  return ((b * size + g) * size + r) * 3;
+}
+
+function applyLut(lut, size, r, g, b) {
+  const scale = size - 1;
+  const scaledR = clamp01(r) * scale;
+  const scaledG = clamp01(g) * scale;
+  const scaledB = clamp01(b) * scale;
+  const r0 = Math.floor(scaledR);
+  const g0 = Math.floor(scaledG);
+  const b0 = Math.floor(scaledB);
+  const r1 = Math.min(r0 + 1, scale);
+  const g1 = Math.min(g0 + 1, scale);
+  const b1 = Math.min(b0 + 1, scale);
+  const tr = scaledR - r0;
+  const tg = scaledG - g0;
+  const tb = scaledB - b0;
+  const output = [0, 0, 0];
+
+  const i000 = lutIndex(size, r0, g0, b0);
+  const i100 = lutIndex(size, r1, g0, b0);
+  const i010 = lutIndex(size, r0, g1, b0);
+  const i110 = lutIndex(size, r1, g1, b0);
+  const i001 = lutIndex(size, r0, g0, b1);
+  const i101 = lutIndex(size, r1, g0, b1);
+  const i011 = lutIndex(size, r0, g1, b1);
+  const i111 = lutIndex(size, r1, g1, b1);
+
+  for (let channel = 0; channel < 3; channel += 1) {
+    const c00 = lut[i000 + channel]
+      + (lut[i100 + channel] - lut[i000 + channel]) * tr;
+    const c10 = lut[i010 + channel]
+      + (lut[i110 + channel] - lut[i010 + channel]) * tr;
+    const c01 = lut[i001 + channel]
+      + (lut[i101 + channel] - lut[i001 + channel]) * tr;
+    const c11 = lut[i011 + channel]
+      + (lut[i111 + channel] - lut[i011 + channel]) * tr;
+    const c0 = c00 + (c10 - c00) * tg;
+    const c1 = c01 + (c11 - c01) * tg;
+    output[channel] = clamp01(c0 + (c1 - c0) * tb);
+  }
+
+  return output;
+}
+
 function applyPresetSrgb(r, g, b, filter) {
   let rr = r;
   let gg = g;
   let bb = b;
 
   if (filter === "classic") {
-    [rr, gg, bb] = saturation(r, g, b, 0.76);
-    rr = (((rr * 255 - 128) * 1.04 + 127) / 255) * 0.97;
-    gg = (((gg * 255 - 128) * 1.02 + 130) / 255) * 0.99;
-    bb = ((bb * 255 - 128) * 0.98 + 134) / 255;
+    return applyLut(S01_LUT, S01_LUT_SIZE, r, g, b);
   } else if (filter === "gold") {
-    [rr, gg, bb] = saturation(r, g, b, 1.1);
-    rr = ((rr * 255 - 128) * 1.04 + 141) / 255;
-    gg = ((gg * 255 - 128) * 1.02 + 134) / 255;
-    bb = ((bb * 255 - 128) * 0.94 + 123) / 255;
+    return applyLut(S02_LUT, S02_LUT_SIZE, r, g, b);
   } else if (filter === "youth") {
     [rr, gg, bb] = saturation(r, g, b, 1.16);
     rr = ((rr * 255 - 128) * 1.05 + 129) / 255;

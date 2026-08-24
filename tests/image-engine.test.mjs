@@ -28,6 +28,48 @@ test("preset strength zero restores the exact original", () => {
   assert.deepEqual(processPixels(source, edit, 42), source.data);
 });
 
+test("S01 uses the provided 33-point Classic Neg LUT", () => {
+  const endpoints = {
+    width: 2,
+    height: 1,
+    data: new Uint8ClampedArray([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ]),
+  };
+  const result = processPixels(
+    endpoints,
+    { filter: "classic", strength: 100, brightness: 0, color: 0, grain: 0 },
+    42,
+  );
+
+  assert.deepEqual(result, new Uint8ClampedArray([
+    6, 6, 6, 255,
+    250, 252, 250, 255,
+  ]));
+});
+
+test("S02 uses the provided 33-point Classic Chrome LUT", () => {
+  const endpoints = {
+    width: 2,
+    height: 1,
+    data: new Uint8ClampedArray([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ]),
+  };
+  const result = processPixels(
+    endpoints,
+    { filter: "gold", strength: 100, brightness: 0, color: 0, grain: 0 },
+    42,
+  );
+
+  assert.deepEqual(result, new Uint8ClampedArray([
+    0, 0, 0, 255,
+    247, 253, 245, 255,
+  ]));
+});
+
 test("preset strength does not scale later manual adjustments", () => {
   const withPresetAtZero = {
     filter: "classic",
