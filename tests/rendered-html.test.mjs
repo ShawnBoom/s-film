@@ -161,6 +161,9 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /\.adjustment-tab\.is-active\s*\{[^}]*background:\s*var\(--accent\)/s);
     assert.match(styles, /\.save-action\s*\{[^}]*background:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.compare-button\s*\{[^}]*border-radius:\s*999px/s);
+    assert.match(styles, /\.privacy-note\s*\{[^}]*color:\s*var\(--control-surface\)/s);
+    assert.match(styles, /\.compare-button\s*\{[^}]*color:\s*var\(--control-surface\)/s);
+    assert.match(styles, /\.thumbnail\.add-photo\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.photo-count\s*\{[^}]*background:\s*transparent[^}]*color:\s*var\(--privacy-dot\)/s);
     assert.match(styles, /\.bottom-action:active:not\(:disabled\)\s*\{[^}]*background:\s*var\(--privacy-dot\)/s);
     assert.match(styles, /overflow:\s*hidden/);
@@ -176,10 +179,10 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=16"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=16"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=16"/);
-  assert.match(staticWorker, /see-static-v16/);
-  assert.match(staticWorker, /image-engine\.js\?v=16/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=17"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=17"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=17"/);
+  assert.match(staticWorker, /see-static-v17/);
+  assert.match(staticWorker, /image-engine\.js\?v=17/);
   assert.match(appWorker, /see-v11/);
 });

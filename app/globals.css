@@ -110,7 +110,7 @@ input:focus-visible {
   align-items: center;
   gap: 6px;
   margin: 0;
-  color: var(--muted);
+  color: var(--control-surface);
   font-size: 9px;
   font-weight: 400;
   white-space: nowrap;
@@ -160,7 +160,7 @@ input:focus-visible {
   z-index: 2;
   border: 0;
   background: rgba(23, 24, 22, 0.76);
-  color: #f4f2eb;
+  color: var(--control-surface);
   backdrop-filter: blur(9px);
 }
 
@@ -173,6 +173,7 @@ input:focus-visible {
   padding: 0 10px;
   place-items: center;
   border-radius: 999px;
+  color: var(--control-surface);
   cursor: pointer;
   font-family: var(--font-schoolbook);
   font-size: 10px;
@@ -271,7 +272,7 @@ input:focus-visible {
   display: grid;
   place-items: center;
   background: transparent;
-  color: var(--muted);
+  color: var(--control-surface);
   font-size: 19px;
   font-weight: 300;
 }
