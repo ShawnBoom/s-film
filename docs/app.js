@@ -1,4 +1,4 @@
-import { hashSeed, processPixels } from "./image-engine.js?v=20";
+import { hashSeed, processPixels } from "./image-engine.js?v=21";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -431,7 +431,7 @@ async function exportPhotos() {
       await new Promise((resolve) => window.setTimeout(resolve, 0));
     }
 
-    const shareData = { files, title: "See", text: "See 处理的照片" };
+    const shareData = { files, title: "See.", text: "See. 处理的照片" };
     if (navigator.share && navigator.canShare?.(shareData)) {
       await navigator.share(shareData);
       setStatus("照片已分享");
@@ -519,7 +519,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=20", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=21", { scope: "./" }).catch(() => {});
   });
 }
 

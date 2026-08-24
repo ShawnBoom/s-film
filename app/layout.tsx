@@ -11,9 +11,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const socialImage = `${origin}/og.png`;
 
   return {
-    title: "See｜手机胶片滤镜",
+    title: "See.",
     description: "不登录、不上传，在手机本地为照片添加胶片质感。",
-    applicationName: "See",
+    applicationName: "See.",
     manifest: "/manifest.webmanifest",
     icons: {
       icon: [
@@ -29,17 +29,17 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     appleWebApp: {
       capable: true,
-      title: "See",
+      title: "See.",
       statusBarStyle: "black-translucent",
     },
     openGraph: {
-      title: "See｜手机胶片滤镜",
+      title: "See.",
       description: "不登录、不上传，在手机本地为照片添加胶片质感。",
       images: [{ url: socialImage, width: 1731, height: 909, alt: "See" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "See｜手机胶片滤镜",
+      title: "See.",
       description: "不登录、不上传，在手机本地为照片添加胶片质感。",
       images: [socialImage],
     },

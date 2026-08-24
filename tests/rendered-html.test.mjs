@@ -83,17 +83,21 @@ test("ships the requested iOS and PWA app icons", async () => {
   const staticManifest = JSON.parse(staticManifestText);
 
   assert.match(layout, /apple-touch-icon\.png/);
-  assert.match(layout, /applicationName:\s*"See"/);
+  assert.match(layout, /title:\s*"See\."/);
+  assert.match(layout, /applicationName:\s*"See\."/);
   assert.match(appManifest, /see-icon-192\.png/);
   assert.match(appManifest, /see-icon-512\.png/);
-  assert.match(appManifest, /short_name:\s*"See"/);
+  assert.match(appManifest, /name:\s*"See\."/);
+  assert.match(appManifest, /short_name:\s*"See\."/);
   assert.match(staticHtml, /see-apple-touch-icon-120\.png/);
   assert.match(staticHtml, /see-apple-touch-icon-152\.png/);
   assert.match(staticHtml, /see-apple-touch-icon-167\.png/);
   assert.match(staticHtml, /see-apple-touch-icon-180\.png/);
-  assert.match(staticHtml, /apple-mobile-web-app-title" content="See"/);
-  assert.equal(staticManifest.name, "See");
-  assert.equal(staticManifest.short_name, "See");
+  assert.match(staticHtml, /apple-mobile-web-app-title" content="See\."/);
+  assert.match(staticHtml, /<title>See\.<\/title>/);
+  assert.doesNotMatch(staticHtml, /S-Film Mobile|See｜手机胶片滤镜/);
+  assert.equal(staticManifest.name, "See.");
+  assert.equal(staticManifest.short_name, "See.");
   assert.deepEqual(staticManifest.icons.map(({ sizes }) => sizes), ["192x192", "512x512"]);
 
   const icons = [
@@ -187,10 +191,10 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=20"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=20"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=20"/);
-  assert.match(staticWorker, /see-static-v20/);
-  assert.match(staticWorker, /image-engine\.js\?v=20/);
-  assert.match(appWorker, /see-v11/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=21"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=21"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=21"/);
+  assert.match(staticWorker, /see-static-v21/);
+  assert.match(staticWorker, /image-engine\.js\?v=21/);
+  assert.match(appWorker, /see-v12/);
 });

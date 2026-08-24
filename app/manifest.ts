@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "See",
-    short_name: "See",
+    name: "See.",
+    short_name: "See.",
     description: "在手机本地为照片添加胶片质感。",
     id: "/",
     start_url: "/",

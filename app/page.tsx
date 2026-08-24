@@ -414,7 +414,7 @@ export default function Home() {
         await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
 
-      const shareData = { files, title: "See", text: "See 处理的照片" };
+      const shareData = { files, title: "See.", text: "See. 处理的照片" };
       if (navigator.share && navigator.canShare?.(shareData)) {
         await navigator.share(shareData);
         setStatus("照片已分享");
