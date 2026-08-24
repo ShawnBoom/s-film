@@ -8,9 +8,9 @@ import type { ChangeEvent, CSSProperties } from "react";
 import { hashSeed, processPixels } from "../lib/image-engine.js";
 
 const FILTERS = [
-  { id: "classic", label: "#S01", name: "FUJI Classic Chrome" },
-  { id: "gold", label: "#S02", name: "KODAK Gold 200" },
-  { id: "youth", label: "#S03", name: "FUJI Youth Blue" },
+  { id: "classic", label: "S01", name: "FUJI Classic Chrome" },
+  { id: "gold", label: "S02", name: "KODAK Gold 200" },
+  { id: "youth", label: "S03", name: "FUJI Youth Blue" },
 ] as const;
 
 type FilterId = (typeof FILTERS)[number]["id"];
@@ -63,8 +63,8 @@ function rangeStyle(value: number, min: number, max: number): CSSProperties {
   return { "--range-progress": progress + "%" } as CSSProperties;
 }
 
-function signed(value: number) {
-  return value > 0 ? "+" + value : String(value);
+function clampAdjustment(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.round(value)));
 }
 
 function zipNumber(view: DataView, offset: number, value: number, bytes: number) {
@@ -156,6 +156,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("等待添加照片");
   const [toast, setToast] = useState("");
+  const [adjustmentDraft, setAdjustmentDraft] = useState("0");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -172,43 +173,43 @@ export default function Home() {
   const adjustmentConfig = useMemo(() => {
     if (activeAdjustment === "strength") {
       return {
-        label: "浓度",
+        label: "Strength",
         min: 0,
         max: 100,
         value: currentEdit.strength,
-        display: currentEdit.strength + "%",
         disabled: !currentPhoto || !currentEdit.filter,
       };
     }
     if (activeAdjustment === "brightness") {
       return {
-        label: "亮度",
+        label: "Light",
         min: -100,
         max: 100,
         value: currentEdit.brightness,
-        display: signed(currentEdit.brightness),
         disabled: !currentPhoto,
       };
     }
     if (activeAdjustment === "color") {
       return {
-        label: "色彩",
+        label: "Color",
         min: -100,
         max: 100,
         value: currentEdit.color,
-        display: signed(currentEdit.color),
         disabled: !currentPhoto,
       };
     }
     return {
-      label: "颗粒",
+      label: "Grain",
       min: 0,
       max: 100,
       value: currentEdit.grain,
-      display: String(currentEdit.grain),
       disabled: !currentPhoto,
     };
   }, [activeAdjustment, currentEdit, currentPhoto]);
+
+  useEffect(() => {
+    setAdjustmentDraft(String(adjustmentConfig.value));
+  }, [activeAdjustment, adjustmentConfig.value, currentPhotoId]);
 
   useEffect(() => {
     photosRef.current = photos;
@@ -295,6 +296,18 @@ export default function Home() {
         index === activeIndex ? { ...item, edit: { ...item.edit, ...patch } } : item,
       ),
     );
+  }
+
+  function updateAdjustmentValue(value: number) {
+    const clamped = clampAdjustment(
+      value,
+      adjustmentConfig.min,
+      adjustmentConfig.max,
+    );
+    setAdjustmentDraft(String(clamped));
+    updateCurrentEdit({
+      [activeAdjustment]: clamped,
+    } as Partial<EditState>);
   }
 
   function handleFiles(event: ChangeEvent<HTMLInputElement>) {
@@ -429,6 +442,10 @@ export default function Home() {
       <section className="editor-card interaction-surface" aria-label="See 照片滤镜">
         <header className="topbar">
           <img className="brand-logo" src="/see-logo.png" alt="See" draggable="false" />
+          <p className="privacy-note">
+            <span aria-hidden="true" />
+            照片仅在本机处理
+          </p>
         </header>
 
         <section className={"photo-stage" + (currentPhoto ? " has-photo" : "")}>
@@ -457,16 +474,14 @@ export default function Home() {
                 aria-pressed={showOriginal}
                 onClick={() => setShowOriginal((value) => !value)}
               >
-                {showOriginal ? "查看效果" : "查看原图"}
+                {showOriginal ? "Edited" : "Original"}
               </button>
               <button
                 className="delete-button"
                 type="button"
                 aria-label="删除当前照片"
                 onClick={deleteCurrent}
-              >
-                ×
-              </button>
+              />
               <span className="photo-count" aria-hidden="true">
                 {activeIndex + 1} / {photos.length}
               </span>
@@ -528,10 +543,10 @@ export default function Home() {
           <nav className="adjustment-tabs" aria-label="微调项目">
             {(
               [
-                ["strength", "浓度"],
-                ["brightness", "亮度"],
-                ["color", "色彩"],
-                ["grain", "颗粒"],
+                ["strength", "Strength"],
+                ["brightness", "Light"],
+                ["color", "Color"],
+                ["grain", "Grain"],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -550,14 +565,11 @@ export default function Home() {
             ))}
           </nav>
 
-          <div className="slider-block">
-            <div className="slider-meta">
-              <label htmlFor="active-adjustment">{adjustmentConfig.label}</label>
-              <output>{adjustmentConfig.display}</output>
-            </div>
+          <div className="slider-row">
             <input
               id="active-adjustment"
               className="range-control"
+              aria-label={adjustmentConfig.label}
               type="range"
               min={adjustmentConfig.min}
               max={adjustmentConfig.max}
@@ -568,38 +580,69 @@ export default function Home() {
                 adjustmentConfig.min,
                 adjustmentConfig.max,
               )}
-              onChange={(event) =>
-                updateCurrentEdit({
-                  [activeAdjustment]: Number(event.target.value),
-                } as Partial<EditState>)
-              }
+              onChange={(event) => updateAdjustmentValue(Number(event.target.value))}
             />
+            <label className="value-input" aria-label={adjustmentConfig.label + " value"}>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={adjustmentConfig.min}
+                max={adjustmentConfig.max}
+                step="1"
+                value={adjustmentDraft}
+                disabled={adjustmentConfig.disabled}
+                aria-label={adjustmentConfig.label + " value"}
+                onFocus={(event) => event.currentTarget.select()}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  setAdjustmentDraft(raw);
+                  if (raw === "" || raw === "-" || raw === "+") return;
+                  const parsed = Number(raw);
+                  if (Number.isFinite(parsed)) updateAdjustmentValue(parsed);
+                }}
+                onBlur={() => {
+                  const parsed = Number(adjustmentDraft);
+                  if (adjustmentDraft === "" || !Number.isFinite(parsed)) {
+                    setAdjustmentDraft(String(adjustmentConfig.value));
+                  } else {
+                    updateAdjustmentValue(parsed);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+              />
+              <span aria-hidden="true">%</span>
+            </label>
           </div>
         </section>
 
-        <div className="secondary-actions">
-          <button type="button" disabled={photos.length < 2} onClick={applyToAll}>
-            应用到全部
+        <div className="bottom-actions">
+          <button
+            className="bottom-action reset-action"
+            type="button"
+            disabled={!currentPhoto}
+            onClick={resetCurrent}
+          >
+            Reset
           </button>
-          <button type="button" disabled={!currentPhoto} onClick={resetCurrent}>
-            重置当前
+          <button
+            className="bottom-action apply-action"
+            type="button"
+            disabled={photos.length < 2}
+            onClick={applyToAll}
+          >
+            Apply All
+          </button>
+          <button
+            className="bottom-action save-action"
+            type="button"
+            disabled={!photos.length || busy}
+            onClick={() => void exportPhotos()}
+          >
+            Save
           </button>
         </div>
-
-        <button
-          className="save-button"
-          type="button"
-          disabled={!photos.length || busy}
-          onClick={() => void exportPhotos()}
-        >
-          <span>{busy ? status : photos.length > 1 ? "保存全部照片" : "保存照片"}</span>
-          <span className="save-arrow" aria-hidden="true">→</span>
-        </button>
-
-        <p className="privacy-note">
-          <span aria-hidden="true" />
-          照片仅在本机处理
-        </p>
         <p className="visually-hidden" role="status" aria-live="polite">
           {status}
         </p>

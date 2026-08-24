@@ -5,14 +5,13 @@
   --paper: #f4f2eb;
   --ink: #171816;
   --muted: #74756f;
-  --line: rgba(23, 24, 22, 0.15);
+  --line: rgba(23, 24, 22, 0.16);
   --panel: #e8e5dc;
   --accent: #ffc926;
   --privacy-dot: #d52518;
   --control-surface: #f3e8cc;
   --control-ink: #171816;
   --font-schoolbook: "Century Schoolbook", "New Century Schoolbook", "Century751 BT", Century, Georgia, "HarmonyOS Sans SC", "HarmonyOS Sans", "PingFang SC", "Noto Sans SC", serif;
-  --font-clarendon: "Clarendon LT Std", "Clarendon BT", SuperClarendon, "Century751 BT", Georgia, "HarmonyOS Sans SC", "HarmonyOS Sans", "PingFang SC", serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -29,7 +28,9 @@
 
 html,
 body {
-  min-height: 100%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
   background: transparent;
   overscroll-behavior: none;
 }
@@ -66,15 +67,14 @@ input:focus-visible {
 }
 
 .interaction-surface button,
-.interaction-surface img {
-  touch-action: manipulation;
-}
+.interaction-surface img { touch-action: manipulation; }
 
 .app-shell {
   width: min(100%, 430px);
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   margin: 0 auto;
+  overflow: hidden;
   background: var(--paper);
 }
 
@@ -82,31 +82,52 @@ input:focus-visible {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  overflow: hidden;
 }
 
 .topbar {
   display: flex;
   align-items: center;
-  flex: 0 0 42px;
-  min-height: 42px;
-  padding: 0 15px;
+  justify-content: space-between;
+  flex: 0 0 40px;
+  min-height: 40px;
+  padding: 0 13px 0 15px;
 }
 
 .brand-logo {
   display: block;
   width: auto;
-  height: 15px;
-  opacity: 0.78;
+  height: 14px;
+  opacity: 0.76;
+}
+
+.privacy-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.privacy-note span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--privacy-dot);
 }
 
 .photo-stage {
   position: relative;
   display: grid;
-  flex: 1 1 auto;
-  min-height: 260px;
+  flex: 1 1 0;
+  min-height: 0;
   place-items: center;
   overflow: hidden;
   background: var(--panel);
@@ -122,14 +143,14 @@ input:focus-visible {
 .photo-stage.has-photo .preview-canvas { display: block; }
 
 .empty-upload {
-  min-width: 116px;
-  min-height: 44px;
-  padding: 0 18px;
+  min-width: 112px;
+  min-height: 40px;
+  padding: 0 17px;
   border: 1px solid currentColor;
   border-radius: 999px;
   background: transparent;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .compare-button,
@@ -137,54 +158,78 @@ input:focus-visible {
 .photo-count {
   position: absolute;
   z-index: 2;
-  min-height: 30px;
   border: 0;
-  background: rgba(23, 24, 22, 0.78);
+  background: rgba(23, 24, 22, 0.76);
   color: #f4f2eb;
-  font-size: 11px;
   backdrop-filter: blur(9px);
 }
 
 .compare-button {
-  left: 11px;
-  bottom: 11px;
+  left: 10px;
+  bottom: 10px;
+  min-height: 28px;
   padding: 0 10px;
   cursor: pointer;
+  font-family: var(--font-schoolbook);
+  font-size: 10px;
+  font-style: normal;
 }
 
-.compare-button.is-active { background: rgba(243, 232, 204, 0.92); color: #171816; }
+.compare-button.is-active {
+  background: rgba(243, 232, 204, 0.92);
+  color: #171816;
+}
 
 .delete-button {
-  top: 10px;
-  right: 10px;
-  display: grid;
-  width: 30px;
-  place-items: center;
+  top: 9px;
+  right: 9px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
   padding: 0;
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 50%;
   cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
+  opacity: 0.9;
 }
 
+.delete-button::before,
+.delete-button::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 1.25px;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+}
+
+.delete-button::before { transform: translate(-50%, -50%) rotate(45deg); }
+.delete-button::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
 .photo-count {
-  right: 11px;
-  bottom: 11px;
+  right: 10px;
+  bottom: 10px;
   display: grid;
-  min-width: 40px;
+  min-width: 38px;
+  min-height: 28px;
   place-items: center;
-  padding: 0 8px;
+  padding: 0 7px;
   pointer-events: none;
+  font-family: var(--font-schoolbook);
+  font-size: 10px;
 }
 
 .thumbnail-rail {
   display: flex;
-  flex: 0 0 auto;
-  gap: 7px;
-  min-height: 54px;
-  padding: 7px 12px;
+  flex: 0 0 46px;
+  gap: 6px;
+  min-height: 46px;
+  padding: 6px 11px;
   overflow-x: auto;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0.5px solid var(--line);
   scrollbar-width: none;
 }
 
@@ -192,13 +237,13 @@ input:focus-visible {
 
 .thumbnail {
   position: relative;
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
   overflow: hidden;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 3px;
+  border: 0.5px solid var(--line);
+  border-radius: 2px;
   background: var(--panel);
   cursor: pointer;
 }
@@ -212,7 +257,7 @@ input:focus-visible {
 
 .thumbnail.is-active {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent);
+  box-shadow: 0 0 0 1.5px var(--accent);
 }
 
 .thumbnail.add-photo {
@@ -220,87 +265,88 @@ input:focus-visible {
   place-items: center;
   background: transparent;
   color: var(--muted);
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 300;
 }
 
 .filter-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  flex: 0 0 48px;
-  border-bottom: 1px solid var(--line);
+  flex: 0 0 40px;
+  min-height: 40px;
+  border-bottom: 0.5px solid var(--line);
 }
 
 .filter-button {
-  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 0;
   border: 0;
-  border-right: 1px solid var(--line);
+  border-right: 0.5px solid var(--line);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 12px;
-  font-family: var(--font-clarendon);
-  font-style: normal;
+  font-family: var(--font-schoolbook);
+  font-size: 11px;
+  font-style: italic;
   font-weight: 400;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.055em;
 }
 
 .filter-button:last-child { border-right: 0; }
 
 .filter-button.is-active {
   color: var(--ink);
-  box-shadow: inset 0 -3px 0 var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .filter-button:disabled,
 .adjustment-tab:disabled,
-.secondary-actions button:disabled {
+.bottom-action:disabled,
+.range-control:disabled,
+.value-input:has(input:disabled) {
   cursor: default;
-  opacity: 0.36;
+  opacity: 0.34;
 }
 
 .adjustment-panel {
-  flex: 0 0 auto;
-  padding: 9px 13px 10px;
+  flex: 0 0 70px;
+  min-height: 70px;
+  padding: 6px 12px 7px;
 }
 
 .adjustment-tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
+  gap: 4px;
 }
 
 .adjustment-tab {
-  min-height: 32px;
+  min-height: 27px;
   padding: 0 4px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .adjustment-tab.is-active {
-  background: var(--control-surface);
-  color: var(--control-ink);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #171816;
   font-weight: 500;
 }
 
-.slider-block { padding-top: 9px; }
-
-.slider-meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin: 0 2px 5px;
-  font-size: 11px;
-}
-
-.slider-meta output {
-  color: var(--muted);
-  font-family: var(--font-clarendon);
-  font-variant-numeric: tabular-nums;
+.slider-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  align-items: center;
+  gap: 9px;
+  min-height: 29px;
+  padding-top: 5px;
 }
 
 .range-control {
@@ -314,7 +360,7 @@ input:focus-visible {
 }
 
 .range-control::-webkit-slider-runnable-track {
-  height: 4px;
+  height: 3px;
   border-radius: 99px;
   background: linear-gradient(
     to right,
@@ -324,8 +370,8 @@ input:focus-visible {
 }
 
 .range-control::-webkit-slider-thumb {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   margin-top: -6px;
   appearance: none;
   border: 0;
@@ -333,74 +379,86 @@ input:focus-visible {
   background: var(--accent);
 }
 
-.range-control:disabled { cursor: default; opacity: 0.35; }
-
-.secondary-actions {
-  display: flex;
-  justify-content: space-between;
-  flex: 0 0 30px;
-  padding: 0 13px 6px;
+.value-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  height: 27px;
+  padding: 0 5px 0 3px;
+  border-bottom: 0.5px solid transparent;
+  color: var(--muted);
+  font-family: var(--font-schoolbook);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
-.secondary-actions button {
+.value-input:focus-within {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.value-input input {
+  width: 100%;
+  min-width: 0;
   padding: 0;
   border: 0;
+  outline: 0;
   background: transparent;
-  color: var(--muted);
+  color: inherit;
+  text-align: right;
+  appearance: textfield;
+  font: inherit;
+}
+
+.value-input input::-webkit-inner-spin-button,
+.value-input input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.bottom-actions {
+  display: grid;
+  grid-template-columns: 0.76fr 1fr 1.12fr;
+  flex: 0 0 46px;
+  min-height: 46px;
+  margin: 0 12px 9px;
+  border: 0.5px solid var(--line);
+}
+
+.bottom-action {
+  min-width: 0;
+  padding: 0 8px;
+  border: 0;
+  border-right: 0.5px solid var(--line);
+  background: transparent;
   cursor: pointer;
   font-size: 11px;
 }
 
-.save-button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 0 0 48px;
-  width: calc(100% - 26px);
-  min-height: 48px;
-  margin: 0 13px;
-  padding: 0 16px;
-  border: 0;
+.bottom-action:last-child { border-right: 0; }
+.reset-action { color: var(--muted); }
+.apply-action { color: var(--ink); }
+
+.save-action {
   background: var(--control-surface);
   color: var(--control-ink);
-  cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-}
-
-.save-button:disabled { cursor: default; opacity: 0.45; }
-.save-arrow { font-size: 20px; }
-
-.privacy-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 30px;
-  gap: 7px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.privacy-note span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--privacy-dot);
 }
 
 .toast {
   position: absolute;
   z-index: 4;
   left: 50%;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  bottom: calc(66px + env(safe-area-inset-bottom));
   max-width: calc(100% - 32px);
   transform: translateX(-50%);
   padding: 8px 12px;
   border-radius: 999px;
   background: rgba(23, 24, 22, 0.9);
   color: #f4f2eb;
-  font-size: 11px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -417,24 +475,24 @@ input:focus-visible {
 
 @media (min-width: 500px) {
   body { padding: 12px; background: #111210; }
+
   .app-shell {
-    min-height: calc(100dvh - 24px);
-    overflow: hidden;
+    height: calc(100dvh - 24px);
     border: 1px solid var(--line);
     border-radius: 28px;
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
   }
-  .editor-card { min-height: calc(100dvh - 24px); }
 }
 
 @media (max-height: 700px) {
-  .photo-stage { min-height: 210px; }
-  .thumbnail-rail { min-height: 48px; padding-block: 5px; }
-  .thumbnail { width: 36px; height: 36px; flex-basis: 36px; }
-  .filter-row { flex-basis: 42px; }
-  .adjustment-panel { padding-block: 7px; }
-  .save-button { flex-basis: 44px; min-height: 44px; }
-  .privacy-note { flex-basis: 26px; }
+  .topbar { flex-basis: 36px; min-height: 36px; }
+  .thumbnail-rail { flex-basis: 42px; min-height: 42px; padding-block: 5px; }
+  .thumbnail { width: 32px; height: 32px; flex-basis: 32px; }
+  .filter-row { flex-basis: 36px; min-height: 36px; }
+  .adjustment-panel { flex-basis: 63px; min-height: 63px; padding-block: 4px 5px; }
+  .adjustment-tab { min-height: 25px; }
+  .slider-row { padding-top: 3px; }
+  .bottom-actions { flex-basis: 42px; min-height: 42px; margin-bottom: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

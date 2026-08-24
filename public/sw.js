@@ -1,4 +1,4 @@
-const CACHE_NAME = "see-v10";
+const CACHE_NAME = "see-v11";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

@@ -26,13 +26,15 @@ test("server-renders the See experience", async () => {
   assert.match(html, /FUJI Classic Chrome/);
   assert.match(html, /KODAK Gold 200/);
   assert.match(html, /FUJI Youth Blue/);
-  assert.match(html, /#S01/);
-  assert.match(html, /#S02/);
-  assert.match(html, /#S03/);
+  assert.match(html, />S01</);
+  assert.match(html, />S02</);
+  assert.match(html, />S03</);
+  assert.doesNotMatch(html, />#S0[123]</);
   assert.match(html, /照片仅在本机处理/);
   assert.match(html, /添加照片/);
-  assert.match(html, /应用到全部/);
-  assert.match(html, /重置当前/);
+  assert.match(html, />Reset</);
+  assert.match(html, />Apply All</);
+  assert.match(html, />Save</);
 });
 
 test("keeps photo processing local, independent per photo, and batch-capable", async () => {
@@ -53,6 +55,9 @@ test("keeps photo processing local, independent per photo, and batch-capable", a
   assert.match(page, /applyToAll/);
   assert.match(page, /deleteCurrent/);
   assert.match(page, /requestAnimationFrame/);
+  assert.match(page, /showOriginal \? "Edited" : "Original"/);
+  assert.match(page, /type="number"/);
+  assert.match(page, /updateAdjustmentValue/);
   assert.match(page, /MAX_PHOTOS = 20/);
   assert.match(page, /createElement\("canvas"\)/);
   assert.match(page, /0\.95/);
@@ -138,20 +143,24 @@ test("uses the requested filter labels and interface colors", async () => {
     readFile(new URL("../docs/styles.css", import.meta.url), "utf8"),
   ]);
 
-  for (const label of ["#S01", "#S02", "#S03"]) {
+  for (const label of ["S01", "S02", "S03"]) {
     assert.match(page, new RegExp(label));
     assert.match(staticHtml, new RegExp(label));
   }
+  assert.doesNotMatch(page, /label:\s*"#S0[123]"/);
+  assert.doesNotMatch(staticHtml, />#S0[123]</);
   for (const styles of [appStyles, staticStyles]) {
     assert.match(styles, /--accent:\s*#ffc926/i);
     assert.match(styles, /--privacy-dot:\s*#d52518/i);
     assert.match(styles, /--control-surface:\s*#f3e8cc/i);
     assert.match(styles, /--font-schoolbook:[^;]*Century Schoolbook/i);
-    assert.match(styles, /--font-clarendon:[^;]*Clarendon LT Std/i);
     assert.match(styles, /HarmonyOS Sans SC/i);
+    assert.doesNotMatch(styles, /--font-clarendon/);
+    assert.match(styles, /\.filter-button\s*\{[^}]*font-family:\s*var\(--font-schoolbook\)[^}]*font-style:\s*italic/s);
     assert.match(styles, /background:\s*var\(--privacy-dot\)/);
-    assert.match(styles, /\.adjustment-tab\.is-active\s*\{[^}]*background:\s*var\(--control-surface\)/s);
-    assert.match(styles, /\.save-button\s*\{[^}]*background:\s*var\(--control-surface\)/s);
+    assert.match(styles, /\.adjustment-tab\.is-active\s*\{[^}]*background:\s*var\(--accent\)/s);
+    assert.match(styles, /\.save-action\s*\{[^}]*background:\s*var\(--control-surface\)/s);
+    assert.match(styles, /overflow:\s*hidden/);
     assert.match(styles, /100dvh/);
   }
 });
@@ -164,10 +173,10 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=12"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=12"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=12"/);
-  assert.match(staticWorker, /see-static-v12/);
-  assert.match(staticWorker, /image-engine\.js\?v=12/);
-  assert.match(appWorker, /see-v10/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=14"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=14"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=14"/);
+  assert.match(staticWorker, /see-static-v14/);
+  assert.match(staticWorker, /image-engine\.js\?v=14/);
+  assert.match(appWorker, /see-v11/);
 });

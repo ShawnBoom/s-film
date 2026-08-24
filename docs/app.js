@@ -1,4 +1,4 @@
-import { hashSeed, processPixels } from "./image-engine.js?v=12";
+import { hashSeed, processPixels } from "./image-engine.js?v=14";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -25,14 +25,12 @@ const elements = {
   thumbnailRail: document.querySelector("#thumbnail-rail"),
   input: document.querySelector("#photo-input"),
   exportButton: document.querySelector("#export-button"),
-  exportCopy: document.querySelector("#export-copy"),
   applyAll: document.querySelector("#apply-all"),
   resetCurrent: document.querySelector("#reset-current"),
   status: document.querySelector("#status-line"),
   toast: document.querySelector("#toast"),
   slider: document.querySelector("#active-adjustment"),
-  sliderLabel: document.querySelector("#slider-label"),
-  sliderValue: document.querySelector("#slider-value"),
+  valueInput: document.querySelector("#adjustment-value"),
   filters: Array.from(document.querySelectorAll("[data-filter]")),
   adjustmentTabs: Array.from(document.querySelectorAll("[data-adjustment]")),
 };
@@ -66,32 +64,28 @@ async function loadImage(url) {
   return image;
 }
 
-function formatValue(adjustment, value) {
-  if (adjustment === "strength") return value + "%";
-  if (adjustment === "brightness" || adjustment === "color") {
-    return value > 0 ? "+" + value : String(value);
-  }
-  return String(value);
-}
-
 function sliderConfig(edit) {
   if (state.activeAdjustment === "strength") {
-    return { label: "浓度", min: 0, max: 100, value: edit.strength };
+    return { label: "Strength", min: 0, max: 100, value: edit.strength };
   }
   if (state.activeAdjustment === "brightness") {
-    return { label: "亮度", min: -100, max: 100, value: edit.brightness };
+    return { label: "Light", min: -100, max: 100, value: edit.brightness };
   }
   if (state.activeAdjustment === "color") {
-    return { label: "色彩", min: -100, max: 100, value: edit.color };
+    return { label: "Color", min: -100, max: 100, value: edit.color };
   }
-  return { label: "颗粒", min: 0, max: 100, value: edit.grain };
+  return { label: "Grain", min: 0, max: 100, value: edit.grain };
+}
+
+function clampAdjustment(value, min, max) {
+  return Math.max(min, Math.min(max, Math.round(value)));
 }
 
 function setShowOriginal(value) {
   state.showOriginal = Boolean(value && currentPhoto());
   elements.compareButton.classList.toggle("is-active", state.showOriginal);
   elements.compareButton.setAttribute("aria-pressed", String(state.showOriginal));
-  elements.compareButton.textContent = state.showOriginal ? "查看效果" : "查看原图";
+  elements.compareButton.textContent = state.showOriginal ? "Edited" : "Original";
   queuePreview();
 }
 
@@ -102,6 +96,14 @@ function updateCurrentEdit(patch) {
   setShowOriginal(false);
   renderControls();
   queuePreview();
+}
+
+function updateAdjustmentValue(value) {
+  const photo = currentPhoto();
+  if (!photo) return;
+  const config = sliderConfig(photo.edit);
+  const clamped = clampAdjustment(value, config.min, config.max);
+  updateCurrentEdit({ [state.activeAdjustment]: clamped });
 }
 
 function renderThumbnails() {
@@ -144,12 +146,6 @@ function renderControls() {
   elements.exportButton.disabled = !photo || state.busy;
   elements.applyAll.disabled = state.photos.length < 2;
   elements.resetCurrent.disabled = !photo;
-  elements.exportCopy.textContent = state.busy
-    ? elements.status.textContent
-    : state.photos.length > 1
-      ? "保存全部照片"
-      : "保存照片";
-
   elements.filters.forEach((button) => {
     const active = edit.filter === button.dataset.filter;
     button.disabled = !photo;
@@ -166,12 +162,18 @@ function renderControls() {
   });
 
   const config = sliderConfig(edit);
-  elements.sliderLabel.textContent = config.label;
+  const sliderDisabled = !photo || (state.activeAdjustment === "strength" && !edit.filter);
+  elements.slider.setAttribute("aria-label", config.label);
   elements.slider.min = String(config.min);
   elements.slider.max = String(config.max);
   elements.slider.value = String(config.value);
-  elements.slider.disabled = !photo || (state.activeAdjustment === "strength" && !edit.filter);
-  elements.sliderValue.textContent = formatValue(state.activeAdjustment, config.value);
+  elements.slider.disabled = sliderDisabled;
+  elements.valueInput.min = String(config.min);
+  elements.valueInput.max = String(config.max);
+  elements.valueInput.value = String(config.value);
+  elements.valueInput.disabled = sliderDisabled;
+  elements.valueInput.setAttribute("aria-label", config.label + " value");
+  elements.valueInput.closest("label").setAttribute("aria-label", config.label + " value");
   const progress = ((config.value - config.min) / (config.max - config.min)) * 100;
   elements.slider.style.setProperty("--range-progress", progress + "%");
   renderThumbnails();
@@ -426,7 +428,6 @@ async function exportPhotos() {
     const files = [];
     for (let index = 0; index < state.photos.length; index += 1) {
       setStatus("正在处理 " + (index + 1) + " / " + state.photos.length);
-      elements.exportCopy.textContent = elements.status.textContent;
       files.push(await processPhoto(state.photos[index]));
       await new Promise((resolve) => window.setTimeout(resolve, 0));
     }
@@ -477,7 +478,32 @@ elements.adjustmentTabs.forEach((button) => {
 });
 
 elements.slider.addEventListener("input", (event) => {
-  updateCurrentEdit({ [state.activeAdjustment]: Number(event.target.value) });
+  updateAdjustmentValue(Number(event.target.value));
+});
+
+elements.valueInput.addEventListener("focus", (event) => event.target.select());
+
+elements.valueInput.addEventListener("input", (event) => {
+  const raw = event.target.value;
+  if (raw === "" || raw === "-" || raw === "+") return;
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed)) updateAdjustmentValue(parsed);
+});
+
+elements.valueInput.addEventListener("blur", () => {
+  const photo = currentPhoto();
+  if (!photo) return;
+  const config = sliderConfig(photo.edit);
+  const parsed = Number(elements.valueInput.value);
+  if (elements.valueInput.value === "" || !Number.isFinite(parsed)) {
+    elements.valueInput.value = String(config.value);
+  } else {
+    updateAdjustmentValue(parsed);
+  }
+});
+
+elements.valueInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") event.target.blur();
 });
 
 document.querySelector(".interaction-surface").addEventListener("contextmenu", (event) => {
@@ -494,7 +520,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=12", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=14", { scope: "./" }).catch(() => {});
   });
 }
 
