@@ -182,7 +182,8 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /\.thumbnail-rail\s*\{[^}]*position:\s*absolute[^}]*height:\s*40px/s);
     assert.match(styles, /\.photo-stage\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0/s);
     assert.match(styles, /\.preview-canvas\s*\{[^}]*width:\s*100%[^}]*height:\s*100%[^}]*object-fit:\s*contain/s);
-    assert.match(styles, /\.welcome-image\s*\{[^}]*width:\s*100%[^}]*height:\s*100%[^}]*object-fit:\s*cover[^}]*pointer-events:\s*none/s);
+    assert.match(styles, /\.welcome-image\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*width:\s*100%[^}]*height:\s*100%[^}]*object-fit:\s*cover[^}]*object-position:\s*center[^}]*pointer-events:\s*none/s);
+    assert.match(styles, /\.photo-stage:not\(\.has-photo\) \.thumbnail-rail\s*\{[^}]*background:\s*transparent/s);
     assert.doesNotMatch(styles, /\.empty-upload\s*\{/);
     assert.match(styles, /\.thumbnail\.add-photo::before,[^}]*\.thumbnail\.add-photo::after\s*\{[^}]*width:\s*10px[^}]*height:\s*1\.25px/s);
     assert.match(styles, /overflow:\s*hidden/);
@@ -198,12 +199,12 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=26"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=26"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=26"/);
-  assert.match(staticWorker, /see-static-v26/);
-  assert.match(staticWorker, /image-engine\.js\?v=26/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=27"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=27"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=27"/);
+  assert.match(staticWorker, /see-static-v27/);
+  assert.match(staticWorker, /image-engine\.js\?v=27/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-v16/);
+  assert.match(appWorker, /see-v17/);
   assert.match(appWorker, /see-welcome\.png/);
 });
