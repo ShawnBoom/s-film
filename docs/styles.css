@@ -165,8 +165,12 @@ input:focus-visible {
 .compare-button {
   left: 10px;
   bottom: 10px;
+  display: grid;
+  min-width: 60px;
   min-height: 28px;
   padding: 0 10px;
+  place-items: center;
+  border-radius: 999px;
   cursor: pointer;
   font-family: var(--font-schoolbook);
   font-size: 10px;
@@ -216,6 +220,9 @@ input:focus-visible {
   place-items: center;
   padding: 0 7px;
   pointer-events: none;
+  background: transparent;
+  color: var(--privacy-dot);
+  backdrop-filter: none;
   font-family: var(--font-schoolbook);
   font-size: 10px;
 }
