@@ -1,4 +1,4 @@
-import { hashSeed, processPixels } from "./image-engine.js?v=27";
+import { hashSeed, processPixels } from "./image-engine.js?v=28";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -516,7 +516,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=27", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=28", { scope: "./" }).catch(() => {});
   });
 }
 
