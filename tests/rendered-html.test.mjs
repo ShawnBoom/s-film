@@ -181,7 +181,7 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /\.bottom-action:active:not\(:disabled\)\s*\{[^}]*border-color:\s*var\(--privacy-dot\)[^}]*background:\s*var\(--privacy-dot\)[^}]*color:\s*var\(--accent\)/s);
     assert.match(styles, /\.thumbnail-rail\s*\{[^}]*position:\s*absolute[^}]*height:\s*40px/s);
     assert.match(styles, /\.photo-stage\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0/s);
-    assert.match(styles, /\.preview-canvas\s*\{[^}]*width:\s*auto[^}]*height:\s*auto[^}]*max-width:\s*100%[^}]*max-height:\s*100%[^}]*object-fit:\s*contain[^}]*object-position:\s*center/s);
+    assert.match(styles, /\.preview-canvas\s*\{[^}]*width:\s*100%[^}]*height:\s*100%[^}]*object-fit:\s*contain[^}]*object-position:\s*center[^}]*image-rendering:\s*auto/s);
     assert.match(styles, /\.welcome-image\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*width:\s*100%[^}]*height:\s*100%[^}]*object-fit:\s*cover[^}]*object-position:\s*center[^}]*pointer-events:\s*none/s);
     assert.match(styles, /\.photo-stage:not\(\.has-photo\) \.thumbnail-rail\s*\{[^}]*background:\s*transparent/s);
     assert.doesNotMatch(styles, /\.empty-upload\s*\{/);
@@ -199,12 +199,12 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=28"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=28"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=28"/);
-  assert.match(staticWorker, /see-static-v28/);
-  assert.match(staticWorker, /image-engine\.js\?v=28/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=29"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=29"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=29"/);
+  assert.match(staticWorker, /see-static-v29/);
+  assert.match(staticWorker, /image-engine\.js\?v=29/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-v18/);
+  assert.match(appWorker, /see-v19/);
   assert.match(appWorker, /see-welcome\.png/);
 });
