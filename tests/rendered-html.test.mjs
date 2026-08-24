@@ -31,7 +31,9 @@ test("server-renders the See experience", async () => {
   assert.match(html, />S03</);
   assert.doesNotMatch(html, />#S0[123]</);
   assert.match(html, /照片仅在本机处理/);
-  assert.match(html, /添加照片/);
+  assert.match(html, /src="\/see-welcome\.png"/);
+  assert.doesNotMatch(html, /class="empty-upload"/);
+  assert.doesNotMatch(html, />添加照片<\/button>/);
   assert.match(html, />Reset</);
   assert.match(html, />Apply All</);
   assert.match(html, />Save</);
@@ -125,12 +127,14 @@ test("ships the requested iOS and PWA app icons", async () => {
   }
 });
 
-test("preserves the supplied logo and cover image bytes", async () => {
+test("preserves the supplied logo, cover, and welcome image bytes", async () => {
   const assets = [
     ["../public/see-logo.png", "e7d3f9b0e02fa8fc70d8c3ca8624b0a50b76b06967cd3e2958b9fb0a541b597a"],
     ["../docs/see-logo.png", "e7d3f9b0e02fa8fc70d8c3ca8624b0a50b76b06967cd3e2958b9fb0a541b597a"],
     ["../public/see-cover.png", "9b326205899b9e9f55c98a1f0a5e5083d4195a5e634a8cc234056033c2028b54"],
     ["../docs/see-cover.png", "9b326205899b9e9f55c98a1f0a5e5083d4195a5e634a8cc234056033c2028b54"],
+    ["../public/see-welcome.png", "2499794a810106b802fc3d3fe19bc9847fdf885f1c8511de83b7b05a9a7bc93a"],
+    ["../docs/see-welcome.png", "2499794a810106b802fc3d3fe19bc9847fdf885f1c8511de83b7b05a9a7bc93a"],
   ];
 
   for (const [path, expectedHash] of assets) {
@@ -177,6 +181,8 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /\.bottom-action:active:not\(:disabled\)\s*\{[^}]*border-color:\s*var\(--privacy-dot\)[^}]*background:\s*var\(--privacy-dot\)[^}]*color:\s*var\(--accent\)/s);
     assert.match(styles, /\.thumbnail-rail\s*\{[^}]*position:\s*absolute[^}]*height:\s*40px/s);
     assert.match(styles, /\.photo-stage\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0/s);
+    assert.match(styles, /\.welcome-image\s*\{[^}]*width:\s*100%[^}]*height:\s*100%[^}]*object-fit:\s*contain[^}]*pointer-events:\s*none/s);
+    assert.doesNotMatch(styles, /\.empty-upload\s*\{/);
     assert.match(styles, /\.thumbnail\.add-photo::before,[^}]*\.thumbnail\.add-photo::after\s*\{[^}]*width:\s*10px[^}]*height:\s*1\.25px/s);
     assert.match(styles, /overflow:\s*hidden/);
     assert.match(styles, /100dvh/);
@@ -191,10 +197,12 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=22"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=22"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=22"/);
-  assert.match(staticWorker, /see-static-v22/);
-  assert.match(staticWorker, /image-engine\.js\?v=22/);
-  assert.match(appWorker, /see-v12/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=23"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=23"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=23"/);
+  assert.match(staticWorker, /see-static-v23/);
+  assert.match(staticWorker, /image-engine\.js\?v=23/);
+  assert.match(staticWorker, /see-welcome\.png/);
+  assert.match(appWorker, /see-v13/);
+  assert.match(appWorker, /see-welcome\.png/);
 });

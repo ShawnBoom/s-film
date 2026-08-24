@@ -142,15 +142,13 @@ input:focus-visible {
 
 .photo-stage.has-photo .preview-canvas { display: block; }
 
-.empty-upload {
-  min-width: 112px;
-  min-height: 40px;
-  padding: 0 17px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
+.welcome-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 
 .compare-button,

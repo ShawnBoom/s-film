@@ -1,4 +1,4 @@
-import { hashSeed, processPixels } from "./image-engine.js?v=22";
+import { hashSeed, processPixels } from "./image-engine.js?v=23";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -18,7 +18,6 @@ const state = {
 const elements = {
   canvas: document.querySelector("#preview"),
   stage: document.querySelector("#photo-stage"),
-  emptyUpload: document.querySelector("#empty-upload"),
   compareButton: document.querySelector("#compare-button"),
   deleteButton: document.querySelector("#delete-button"),
   photoCount: document.querySelector("#photo-count"),
@@ -127,7 +126,7 @@ function renderThumbnails() {
     const add = document.createElement("button");
     add.type = "button";
     add.className = "thumbnail add-photo";
-    add.setAttribute("aria-label", "继续添加照片");
+    add.setAttribute("aria-label", state.photos.length ? "继续添加照片" : "添加照片");
     add.addEventListener("click", () => elements.input.click());
     elements.thumbnailRail.append(add);
   }
@@ -137,7 +136,6 @@ function renderControls() {
   const photo = currentPhoto();
   const edit = photo ? photo.edit : createNeutralEdit();
   elements.stage.classList.toggle("has-photo", Boolean(photo));
-  elements.emptyUpload.hidden = Boolean(photo);
   elements.compareButton.hidden = !photo;
   elements.deleteButton.hidden = !photo;
   elements.photoCount.hidden = !photo;
@@ -451,7 +449,6 @@ async function exportPhotos() {
   }
 }
 
-elements.emptyUpload.addEventListener("click", () => elements.input.click());
 elements.input.addEventListener("change", (event) => {
   handleFiles(event.target.files);
   event.target.value = "";
@@ -519,7 +516,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=22", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=23", { scope: "./" }).catch(() => {});
   });
 }
 

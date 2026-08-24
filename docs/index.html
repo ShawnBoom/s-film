@@ -19,15 +19,15 @@
     <meta name="twitter:description" content="不登录、不上传，在手机本地为照片添加胶片质感。" />
     <meta name="twitter:image" content="https://shawnboom.github.io/s-film/og.png" />
     <title>See.</title>
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=22" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=23" />
     <link rel="apple-touch-icon" sizes="120x120" href="./icons/see-apple-touch-icon-120.png" />
     <link rel="apple-touch-icon" sizes="152x152" href="./icons/see-apple-touch-icon-152.png" />
     <link rel="apple-touch-icon" sizes="167x167" href="./icons/see-apple-touch-icon-167.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/see-apple-touch-icon-180.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/see-icon-192.png" />
-    <link rel="manifest" href="./manifest.webmanifest?v=22" />
-    <link rel="stylesheet" href="./styles.css?v=22" />
-    <script type="module" src="./app.js?v=22"></script>
+    <link rel="manifest" href="./manifest.webmanifest?v=23" />
+    <link rel="stylesheet" href="./styles.css?v=23" />
+    <script type="module" src="./app.js?v=23"></script>
   </head>
   <body>
     <main class="app-shell">
@@ -38,8 +38,8 @@
         </header>
 
         <section class="photo-stage" id="photo-stage">
+          <img class="welcome-image" id="welcome-image" src="./see-welcome.png" width="1064" height="1891" alt="See." draggable="false" />
           <canvas id="preview" class="preview-canvas" aria-label="照片滤镜预览"></canvas>
-          <button class="empty-upload" id="empty-upload" type="button">添加照片</button>
           <button class="compare-button" id="compare-button" type="button" hidden>Original</button>
           <button class="delete-button" id="delete-button" type="button" aria-label="删除当前照片" hidden></button>
           <span class="photo-count" id="photo-count" hidden></span>

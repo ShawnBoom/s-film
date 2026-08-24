@@ -449,22 +449,20 @@ export default function Home() {
         </header>
 
         <section className={"photo-stage" + (currentPhoto ? " has-photo" : "")}>
+          {!currentPhoto && (
+            <img
+              className="welcome-image"
+              src="/see-welcome.png"
+              alt="See."
+              draggable="false"
+            />
+          )}
           <canvas
             ref={canvasRef}
             className="preview-canvas"
             aria-label="照片滤镜预览"
             onContextMenu={(event) => event.preventDefault()}
           />
-
-          {!currentPhoto && (
-            <button
-              className="empty-upload"
-              type="button"
-              onClick={() => inputRef.current?.click()}
-            >
-              添加照片
-            </button>
-          )}
 
           {currentPhoto && (
             <>
@@ -504,7 +502,7 @@ export default function Home() {
               <button
                 className="thumbnail add-photo"
                 type="button"
-                aria-label="继续添加照片"
+                aria-label={photos.length ? "继续添加照片" : "添加照片"}
                 onClick={() => inputRef.current?.click()}
               />
             )}

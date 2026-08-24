@@ -1,15 +1,15 @@
 "use strict";
 
-const CACHE_NAME = "see-static-v22";
+const CACHE_NAME = "see-static-v23";
 const ROOT = new URL("./", self.registration.scope).href;
 const APP_SHELL = [
   ROOT,
   new URL("./index.html", ROOT).href,
-  new URL("./styles.css?v=22", ROOT).href,
-  new URL("./app.js?v=22", ROOT).href,
-  new URL("./image-engine.js?v=22", ROOT).href,
-  new URL("./manifest.webmanifest?v=22", ROOT).href,
-  new URL("./apple-touch-icon.png?v=22", ROOT).href,
+  new URL("./styles.css?v=23", ROOT).href,
+  new URL("./app.js?v=23", ROOT).href,
+  new URL("./image-engine.js?v=23", ROOT).href,
+  new URL("./manifest.webmanifest?v=23", ROOT).href,
+  new URL("./apple-touch-icon.png?v=23", ROOT).href,
   new URL("./icons/see-apple-touch-icon-120.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-152.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-167.png", ROOT).href,
@@ -17,6 +17,7 @@ const APP_SHELL = [
   new URL("./icons/see-icon-192.png", ROOT).href,
   new URL("./icons/see-icon-512.png", ROOT).href,
   new URL("./see-logo.png", ROOT).href,
+  new URL("./see-welcome.png", ROOT).href,
   new URL("./see-cover.png", ROOT).href,
   new URL("./s-film-social.png", ROOT).href,
   new URL("./og.png", ROOT).href,
