@@ -26,10 +26,12 @@ test("server-renders the See experience", async () => {
   assert.match(html, /FUJI Classic Chrome/);
   assert.match(html, /KODAK Gold 200/);
   assert.match(html, /FUJI Youth Blue/);
-  assert.match(html, />S01</);
-  assert.match(html, />S02</);
-  assert.match(html, />S03</);
-  assert.doesNotMatch(html, />#S0[123]</);
+  for (let number = 1; number <= 12; number += 1) {
+    const label = "S" + String(number).padStart(2, "0");
+    assert.match(html, new RegExp(">" + label + "<"));
+  }
+  assert.equal(Array.from(html.matchAll(/class="filter-button/g)).length, 12);
+  assert.doesNotMatch(html, />#S(?:0[1-9]|1[0-2])</);
   assert.match(html, /照片仅在本机处理/);
   assert.match(html, /src="\/see-welcome\.png"/);
   assert.doesNotMatch(html, /class="empty-upload"/);
@@ -151,12 +153,13 @@ test("uses the requested filter labels and interface colors", async () => {
     readFile(new URL("../docs/styles.css", import.meta.url), "utf8"),
   ]);
 
-  for (const label of ["S01", "S02", "S03"]) {
+  for (let number = 1; number <= 12; number += 1) {
+    const label = "S" + String(number).padStart(2, "0");
     assert.match(page, new RegExp(label));
     assert.match(staticHtml, new RegExp(label));
   }
-  assert.doesNotMatch(page, /label:\s*"#S0[123]"/);
-  assert.doesNotMatch(staticHtml, />#S0[123]</);
+  assert.doesNotMatch(page, /label:\s*"#S(?:0[1-9]|1[0-2])"/);
+  assert.doesNotMatch(staticHtml, />#S(?:0[1-9]|1[0-2])</);
   for (const styles of [appStyles, staticStyles]) {
     assert.match(styles, /--accent:\s*#ffc926/i);
     assert.match(styles, /--privacy-dot:\s*#d52518/i);
@@ -167,6 +170,9 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /\.filter-button\s*\{[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)[^}]*font-family:\s*var\(--font-schoolbook\)[^}]*font-style:\s*italic/s);
     assert.match(styles, /background:\s*var\(--privacy-dot\)/);
     assert.match(styles, /\.filter-button\.is-active\s*\{[^}]*color:\s*var\(--control-surface\)/s);
+    assert.match(styles, /\.filter-row\s*\{[^}]*grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)[^}]*grid-template-rows:\s*repeat\(2, minmax\(0, 1fr\)\)[^}]*flex:\s*0 0 68px[^}]*min-height:\s*68px/s);
+    assert.match(styles, /\.filter-button:nth-child\(6n\)\s*\{[^}]*border-right:\s*0/s);
+    assert.match(styles, /\.filter-button:nth-child\(-n \+ 6\)\s*\{[^}]*border-bottom:\s*0\.5px solid var\(--line\)/s);
     assert.match(styles, /\.adjustment-tab\.is-active\s*\{[^}]*background:\s*var\(--accent\)[^}]*color:\s*var\(--privacy-dot\)/s);
     assert.match(styles, /\.adjustment-tab\s*\{[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)/s);
     assert.match(styles, /\.bottom-action\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*transparent[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)/s);
@@ -199,13 +205,13 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=33"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=33"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=33"/);
-  assert.match(staticWorker, /see-static-v33/);
-  assert.match(staticWorker, /image-engine\.js\?v=33/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=33/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=33/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=34"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=34"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=34"/);
+  assert.match(staticWorker, /see-static-v34/);
+  assert.match(staticWorker, /image-engine\.js\?v=34/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=34/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=34/);
   assert.match(staticWorker, /see-welcome\.png/);
   assert.match(appWorker, /see-v21/);
   assert.match(appWorker, /see-welcome\.png/);

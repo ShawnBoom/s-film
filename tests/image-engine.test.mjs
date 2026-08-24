@@ -70,6 +70,18 @@ test("S02 uses the provided 33-point Classic Chrome LUT", () => {
   ]));
 });
 
+test("future filter slots do not add effects before their LUTs are supplied", () => {
+  for (let number = 4; number <= 12; number += 1) {
+    const filter = "slot" + String(number).padStart(2, "0");
+    const result = processPixels(
+      source,
+      { filter, strength: 100, brightness: 0, color: 0, grain: 0 },
+      42,
+    );
+    assert.deepEqual(result, source.data, filter);
+  }
+});
+
 test("preset strength does not scale later manual adjustments", () => {
   const withPresetAtZero = {
     filter: "classic",

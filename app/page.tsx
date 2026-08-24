@@ -11,6 +11,15 @@ const FILTERS = [
   { id: "classic", label: "S01", name: "FUJI Classic Chrome" },
   { id: "gold", label: "S02", name: "KODAK Gold 200" },
   { id: "youth", label: "S03", name: "FUJI Youth Blue" },
+  { id: "slot04", label: "S04", name: "" },
+  { id: "slot05", label: "S05", name: "" },
+  { id: "slot06", label: "S06", name: "" },
+  { id: "slot07", label: "S07", name: "" },
+  { id: "slot08", label: "S08", name: "" },
+  { id: "slot09", label: "S09", name: "" },
+  { id: "slot10", label: "S10", name: "" },
+  { id: "slot11", label: "S11", name: "" },
+  { id: "slot12", label: "S12", name: "" },
 ] as const;
 
 type FilterId = (typeof FILTERS)[number]["id"];
@@ -524,7 +533,7 @@ export default function Home() {
               className={"filter-button" + (currentEdit.filter === filter.id ? " is-active" : "")}
               type="button"
               key={filter.id}
-              aria-label={filter.label + " " + filter.name}
+              aria-label={filter.name ? filter.label + " " + filter.name : filter.label}
               aria-pressed={currentEdit.filter === filter.id}
               disabled={!currentPhoto}
               onClick={() => updateCurrentEdit({ filter: filter.id })}

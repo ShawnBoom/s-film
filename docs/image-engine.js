@@ -1,5 +1,5 @@
-import { S01_LUT, S01_LUT_SIZE } from "./s01-classic-neg-lut.js?v=33";
-import { S02_LUT, S02_LUT_SIZE } from "./s02-classic-chrome-lut.js?v=33";
+import { S01_LUT, S01_LUT_SIZE } from "./s01-classic-neg-lut.js?v=34";
+import { S02_LUT, S02_LUT_SIZE } from "./s02-classic-chrome-lut.js?v=34";
 
 const SRGB_TO_LINEAR = Array.from({ length: 256 }, (_, value) => {
   const channel = value / 255;
