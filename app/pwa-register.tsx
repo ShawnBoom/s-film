@@ -5,7 +5,7 @@ import { useEffect } from "react";
 export function PwaRegister() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js?v=19").catch(() => {
+      navigator.serviceWorker.register("/sw.js?v=20").catch(() => {
         // The app remains fully usable online if registration is unavailable.
       });
     }
