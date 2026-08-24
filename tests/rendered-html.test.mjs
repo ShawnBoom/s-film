@@ -133,8 +133,8 @@ test("preserves the supplied logo, cover, and welcome image bytes", async () => 
     ["../docs/see-logo.png", "e7d3f9b0e02fa8fc70d8c3ca8624b0a50b76b06967cd3e2958b9fb0a541b597a"],
     ["../public/see-cover.png", "9b326205899b9e9f55c98a1f0a5e5083d4195a5e634a8cc234056033c2028b54"],
     ["../docs/see-cover.png", "9b326205899b9e9f55c98a1f0a5e5083d4195a5e634a8cc234056033c2028b54"],
-    ["../public/see-welcome.png", "e2cec3f69269ecb1f58d98eefa57f1d76385afa7e449452863bca8754804d0f7"],
-    ["../docs/see-welcome.png", "e2cec3f69269ecb1f58d98eefa57f1d76385afa7e449452863bca8754804d0f7"],
+    ["../public/see-welcome.png", "45d245f23b5ca47780c1592707eeed632c4b685ea4688a62a8b017ded626e6d4"],
+    ["../docs/see-welcome.png", "45d245f23b5ca47780c1592707eeed632c4b685ea4688a62a8b017ded626e6d4"],
   ];
 
   for (const [path, expectedHash] of assets) {
@@ -197,12 +197,12 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=24"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=24"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=24"/);
-  assert.match(staticWorker, /see-static-v24/);
-  assert.match(staticWorker, /image-engine\.js\?v=24/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=25"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=25"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=25"/);
+  assert.match(staticWorker, /see-static-v25/);
+  assert.match(staticWorker, /image-engine\.js\?v=25/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-v14/);
+  assert.match(appWorker, /see-v15/);
   assert.match(appWorker, /see-welcome\.png/);
 });

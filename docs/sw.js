@@ -1,15 +1,15 @@
 "use strict";
 
-const CACHE_NAME = "see-static-v24";
+const CACHE_NAME = "see-static-v25";
 const ROOT = new URL("./", self.registration.scope).href;
 const APP_SHELL = [
   ROOT,
   new URL("./index.html", ROOT).href,
-  new URL("./styles.css?v=24", ROOT).href,
-  new URL("./app.js?v=24", ROOT).href,
-  new URL("./image-engine.js?v=24", ROOT).href,
-  new URL("./manifest.webmanifest?v=24", ROOT).href,
-  new URL("./apple-touch-icon.png?v=24", ROOT).href,
+  new URL("./styles.css?v=25", ROOT).href,
+  new URL("./app.js?v=25", ROOT).href,
+  new URL("./image-engine.js?v=25", ROOT).href,
+  new URL("./manifest.webmanifest?v=25", ROOT).href,
+  new URL("./apple-touch-icon.png?v=25", ROOT).href,
   new URL("./icons/see-apple-touch-icon-120.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-152.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-167.png", ROOT).href,
