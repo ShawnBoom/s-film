@@ -158,7 +158,8 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.doesNotMatch(styles, /--font-clarendon/);
     assert.match(styles, /\.filter-button\s*\{[^}]*font-family:\s*var\(--font-schoolbook\)[^}]*font-style:\s*italic/s);
     assert.match(styles, /background:\s*var\(--privacy-dot\)/);
-    assert.match(styles, /\.adjustment-tab\.is-active\s*\{[^}]*background:\s*var\(--accent\)/s);
+    assert.match(styles, /\.filter-button\.is-active\s*\{[^}]*color:\s*var\(--privacy-dot\)/s);
+    assert.match(styles, /\.adjustment-tab\.is-active\s*\{[^}]*background:\s*var\(--accent\)[^}]*color:\s*var\(--privacy-dot\)/s);
     assert.match(styles, /\.save-action\s*\{[^}]*background:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.compare-button\s*\{[^}]*border-radius:\s*999px/s);
     assert.match(styles, /\.privacy-note\s*\{[^}]*color:\s*var\(--control-surface\)/s);
@@ -179,10 +180,10 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=17"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=17"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=17"/);
-  assert.match(staticWorker, /see-static-v17/);
-  assert.match(staticWorker, /image-engine\.js\?v=17/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=18"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=18"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=18"/);
+  assert.match(staticWorker, /see-static-v18/);
+  assert.match(staticWorker, /image-engine\.js\?v=18/);
   assert.match(appWorker, /see-v11/);
 });
