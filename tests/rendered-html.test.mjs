@@ -30,24 +30,39 @@ test("server-renders the See experience", async () => {
   assert.match(html, /#S02/);
   assert.match(html, /#S03/);
   assert.match(html, /照片仅在本机处理/);
-  assert.match(html, /选择手机照片/);
+  assert.match(html, /添加照片/);
+  assert.match(html, /应用到全部/);
+  assert.match(html, /重置当前/);
 });
 
-test("keeps photo processing local and batch-capable", async () => {
-  const [page, layout, packageJson] = await Promise.all([
+test("keeps photo processing local, independent per photo, and batch-capable", async () => {
+  const [page, engine, staticApp, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/image-engine.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /processPixels/);
-  assert.match(page, /\/see-cover\.png/);
-  assert.match(page, /comparing \|\| photos\.length === 0/);
-  assert.match(page, /useState\(100\)/);
+  assert.match(page, /edit:\s*EditState/);
+  assert.match(page, /filter:\s*null,\s*strength:\s*100,\s*brightness:\s*0,\s*color:\s*0,\s*grain:\s*0/);
   assert.match(page, /type="file"[^>]*multiple/);
   assert.match(page, /navigator\.share/);
+  assert.match(page, /createZip/);
+  assert.match(page, /applyToAll/);
+  assert.match(page, /deleteCurrent/);
+  assert.match(page, /requestAnimationFrame/);
   assert.match(page, /MAX_PHOTOS = 20/);
   assert.match(page, /createElement\("canvas"\)/);
+  assert.match(page, /0\.95/);
+  assert.match(engine, /linearRgbToOklab/);
+  assert.match(engine, /applyExposure/);
+  assert.match(engine, /valueNoise/);
+  assert.match(engine, /strength === 0/);
+  assert.match(staticApp, /edit:\s*createNeutralEdit\(\)/);
+  assert.match(staticApp, /navigator\.canShare/);
+  assert.match(staticApp, /See_Photos\.zip/);
   assert.match(layout, /manifest:\s*"\/manifest\.webmanifest"/);
   assert.match(layout, /PwaRegister/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
@@ -131,8 +146,28 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /--accent:\s*#ffc926/i);
     assert.match(styles, /--privacy-dot:\s*#d52518/i);
     assert.match(styles, /--control-surface:\s*#f3e8cc/i);
+    assert.match(styles, /--font-schoolbook:[^;]*Century Schoolbook/i);
+    assert.match(styles, /--font-clarendon:[^;]*Clarendon LT Std/i);
+    assert.match(styles, /HarmonyOS Sans SC/i);
     assert.match(styles, /background:\s*var\(--privacy-dot\)/);
-    assert.match(styles, /\.adjustment-tabs button\.active\s*\{[^}]*background:\s*var\(--control-surface\)/s);
-    assert.match(styles, /\.primary-button\s*\{[^}]*background:\s*var\(--control-surface\)/s);
+    assert.match(styles, /\.adjustment-tab\.is-active\s*\{[^}]*background:\s*var\(--control-surface\)/s);
+    assert.match(styles, /\.save-button\s*\{[^}]*background:\s*var\(--control-surface\)/s);
+    assert.match(styles, /100dvh/);
   }
+});
+
+test("ships cache-busted, relative GitHub Pages assets", async () => {
+  const [staticHtml, staticWorker, staticApp, appWorker] = await Promise.all([
+    readFile(new URL("../docs/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../docs/sw.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=12"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=12"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=12"/);
+  assert.match(staticWorker, /see-static-v12/);
+  assert.match(staticWorker, /image-engine\.js\?v=12/);
+  assert.match(appWorker, /see-v10/);
 });

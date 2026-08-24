@@ -1,415 +1,501 @@
-"use strict";
-
-const FILTERS = {
-  classic: { name: "FUJI Classic Chrome", defaultGrain: 8 },
-  gold: { name: "KODAK Gold 200", defaultGrain: 11 },
-  youth: { name: "FUJI Youth Blue", defaultGrain: 7 },
-};
+import { hashSeed, processPixels } from "./image-engine.js?v=12";
 
 const MAX_PHOTOS = 20;
-const PREVIEW_LONG_EDGE = 1400;
-const EXPORT_LONG_EDGE = 5000;
+const PREVIEW_LONG_EDGE = 960;
 
 const state = {
   photos: [],
   activeIndex: 0,
-  activeFilter: "classic",
-  strength: 100,
-  brightness: 0,
-  color: 0,
-  grain: 8,
-  activeAdjustment: "strength",
-  comparing: false,
+  activeAdjustment: "brightness",
+  showOriginal: false,
   busy: false,
   sourceData: null,
+  renderFrame: 0,
+  loadToken: 0,
+  toastTimer: 0,
 };
 
 const elements = {
   canvas: document.querySelector("#preview"),
+  stage: document.querySelector("#photo-stage"),
+  emptyUpload: document.querySelector("#empty-upload"),
   compareButton: document.querySelector("#compare-button"),
+  deleteButton: document.querySelector("#delete-button"),
   photoCount: document.querySelector("#photo-count"),
+  thumbnailRail: document.querySelector("#thumbnail-rail"),
   input: document.querySelector("#photo-input"),
-  resetButton: document.querySelector("#reset-button"),
   exportButton: document.querySelector("#export-button"),
   exportCopy: document.querySelector("#export-copy"),
+  applyAll: document.querySelector("#apply-all"),
+  resetCurrent: document.querySelector("#reset-current"),
   status: document.querySelector("#status-line"),
+  toast: document.querySelector("#toast"),
+  slider: document.querySelector("#active-adjustment"),
+  sliderLabel: document.querySelector("#slider-label"),
+  sliderValue: document.querySelector("#slider-value"),
   filters: Array.from(document.querySelectorAll("[data-filter]")),
   adjustmentTabs: Array.from(document.querySelectorAll("[data-adjustment]")),
-  sliderControls: Array.from(document.querySelectorAll("[data-slider]")),
-  sliders: {
-    strength: document.querySelector("#strength"),
-    brightness: document.querySelector("#brightness"),
-    color: document.querySelector("#color"),
-    grain: document.querySelector("#grain"),
-  },
-  values: {
-    strength: document.querySelector("#strength-value"),
-    brightness: document.querySelector("#brightness-value"),
-    color: document.querySelector("#color-value"),
-    grain: document.querySelector("#grain-value"),
-  },
 };
 
-function clamp(value) {
-  return Math.max(0, Math.min(255, value));
+function createNeutralEdit() {
+  return { filter: null, strength: 100, brightness: 0, color: 0, grain: 0 };
 }
 
-function saturation(r, g, b, amount) {
-  const lightness = r * 0.299 + g * 0.587 + b * 0.114;
-  return [
-    lightness + (r - lightness) * amount,
-    lightness + (g - lightness) * amount,
-    lightness + (b - lightness) * amount,
-  ];
-}
-
-function processPixels(source, filter, settings) {
-  const output = new Uint8ClampedArray(source.data.length);
-  const mix = settings.strength / 100;
-  const brightnessShift = settings.brightness * 1.7;
-  const colorAmount = 1 + settings.color / 100;
-
-  for (let i = 0; i < source.data.length; i += 4) {
-    const r = source.data[i];
-    const g = source.data[i + 1];
-    const b = source.data[i + 2];
-    let rr = r;
-    let gg = g;
-    let bb = b;
-
-    if (filter === "classic") {
-      [rr, gg, bb] = saturation(r, g, b, 0.76);
-      rr = (rr - 128) * 1.04 + 127;
-      gg = (gg - 128) * 1.02 + 130;
-      bb = (bb - 128) * 0.98 + 134;
-      rr *= 0.97;
-      gg *= 0.99;
-    } else if (filter === "gold") {
-      [rr, gg, bb] = saturation(r, g, b, 1.1);
-      rr = (rr - 128) * 1.04 + 141;
-      gg = (gg - 128) * 1.02 + 134;
-      bb = (bb - 128) * 0.94 + 123;
-    } else {
-      [rr, gg, bb] = saturation(r, g, b, 1.16);
-      rr = (rr - 128) * 1.05 + 129;
-      gg = (gg - 128) * 1.06 + 132;
-      bb = (bb - 128) * 1.08 + 139;
-    }
-
-    rr = r + (rr - r) * mix + brightnessShift;
-    gg = g + (gg - g) * mix + brightnessShift;
-    bb = b + (bb - b) * mix + brightnessShift;
-    [rr, gg, bb] = saturation(rr, gg, bb, colorAmount);
-
-    const pixel = i >> 2;
-    const hash = (Math.imul(pixel + 17, 1103515245) + 12345) >>> 0;
-    const noise = (((hash & 1023) / 1023) - 0.5) * settings.grain * 1.35;
-
-    output[i] = clamp(rr + noise);
-    output[i + 1] = clamp(gg + noise);
-    output[i + 2] = clamp(bb + noise);
-    output[i + 3] = source.data[i + 3];
-  }
-
-  return output;
-}
-
-function loadImage(url) {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("无法读取这张照片"));
-    image.src = url;
-  });
-}
-
-function canvasBlob(canvas) {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("照片导出失败"))),
-      "image/jpeg",
-      0.92,
-    );
-  });
-}
-
-function settings() {
-  return {
-    strength: state.strength,
-    brightness: state.brightness,
-    color: state.color,
-    grain: state.grain,
-  };
-}
-
-function signed(value) {
-  return value > 0 ? `+${value}` : String(value);
+function currentPhoto() {
+  return state.photos[state.activeIndex] || null;
 }
 
 function setStatus(message) {
   elements.status.textContent = message;
 }
 
-function updateSlider(name) {
-  const input = elements.sliders[name];
-  const value = state[name];
-  const progress = name === "strength"
-    ? value
-    : name === "brightness"
-      ? (value + 25) * 2
-      : name === "color"
-        ? ((value + 30) / 60) * 100
-        : (value / 30) * 100;
-  input.value = String(value);
-  input.style.setProperty("--range-progress", `${progress}%`);
-  elements.values[name].textContent = ["brightness", "color"].includes(name)
-    ? signed(value)
-    : String(value);
+function showToast(message) {
+  elements.toast.textContent = message;
+  elements.toast.hidden = false;
+  window.clearTimeout(state.toastTimer);
+  state.toastTimer = window.setTimeout(() => {
+    elements.toast.hidden = true;
+  }, 1800);
 }
 
-function updateAllSliders() {
-  Object.keys(elements.sliders).forEach(updateSlider);
+async function loadImage(url) {
+  const image = new Image();
+  image.decoding = "async";
+  image.src = url;
+  await image.decode();
+  return image;
 }
 
-function drawPreview() {
-  if (!state.sourceData) return;
-  const context = elements.canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) return;
-  const frame = context.createImageData(state.sourceData.width, state.sourceData.height);
-  frame.data.set(
-    state.comparing || !state.photos.length
-      ? state.sourceData.data
-      : processPixels(state.sourceData, state.activeFilter, settings()),
-  );
-  context.putImageData(frame, 0, 0);
+function formatValue(adjustment, value) {
+  if (adjustment === "strength") return value + "%";
+  if (adjustment === "brightness" || adjustment === "color") {
+    return value > 0 ? "+" + value : String(value);
+  }
+  return String(value);
 }
 
-async function loadPreview() {
-  const sourceUrl = state.photos[state.activeIndex]?.url || "./see-cover.png";
-  try {
-    const image = await loadImage(sourceUrl);
-    const scale = Math.min(1, PREVIEW_LONG_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = elements.canvas;
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("当前浏览器无法处理照片");
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    state.sourceData = context.getImageData(0, 0, canvas.width, canvas.height);
-    drawPreview();
-    setStatus(state.photos.length ? `已选择 ${state.photos.length} 张照片` : "示例预览 · 请选择你的照片");
-  } catch {
-    setStatus("这张照片暂时无法读取，请换一张试试");
+function sliderConfig(edit) {
+  if (state.activeAdjustment === "strength") {
+    return { label: "浓度", min: 0, max: 100, value: edit.strength };
+  }
+  if (state.activeAdjustment === "brightness") {
+    return { label: "亮度", min: -100, max: 100, value: edit.brightness };
+  }
+  if (state.activeAdjustment === "color") {
+    return { label: "色彩", min: -100, max: 100, value: edit.color };
+  }
+  return { label: "颗粒", min: 0, max: 100, value: edit.grain };
+}
+
+function setShowOriginal(value) {
+  state.showOriginal = Boolean(value && currentPhoto());
+  elements.compareButton.classList.toggle("is-active", state.showOriginal);
+  elements.compareButton.setAttribute("aria-pressed", String(state.showOriginal));
+  elements.compareButton.textContent = state.showOriginal ? "查看效果" : "查看原图";
+  queuePreview();
+}
+
+function updateCurrentEdit(patch) {
+  const photo = currentPhoto();
+  if (!photo) return;
+  Object.assign(photo.edit, patch);
+  setShowOriginal(false);
+  renderControls();
+  queuePreview();
+}
+
+function renderThumbnails() {
+  elements.thumbnailRail.replaceChildren();
+  state.photos.forEach((photo, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "thumbnail" + (index === state.activeIndex ? " is-active" : "");
+    button.setAttribute("aria-label", "选择第 " + (index + 1) + " 张照片");
+    button.setAttribute("aria-pressed", String(index === state.activeIndex));
+    const image = document.createElement("img");
+    image.src = photo.url;
+    image.alt = "";
+    image.draggable = false;
+    button.append(image);
+    button.addEventListener("click", () => selectPhoto(index));
+    elements.thumbnailRail.append(button);
+  });
+
+  if (state.photos.length < MAX_PHOTOS) {
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "thumbnail add-photo";
+    add.setAttribute("aria-label", "继续添加照片");
+    add.textContent = "+";
+    add.addEventListener("click", () => elements.input.click());
+    elements.thumbnailRail.append(add);
   }
 }
 
-function updatePhotoControls() {
-  const hasPhotos = state.photos.length > 0;
-  elements.photoCount.textContent = hasPhotos ? `${state.activeIndex + 1} / ${state.photos.length}` : "轻点选照片";
-  elements.photoCount.setAttribute("aria-label", hasPhotos && state.photos.length > 1 ? "查看下一张照片" : "选择手机照片");
+function renderControls() {
+  const photo = currentPhoto();
+  const edit = photo ? photo.edit : createNeutralEdit();
+  elements.stage.classList.toggle("has-photo", Boolean(photo));
+  elements.emptyUpload.hidden = Boolean(photo);
+  elements.compareButton.hidden = !photo;
+  elements.deleteButton.hidden = !photo;
+  elements.photoCount.hidden = !photo;
+  elements.photoCount.textContent = photo ? state.activeIndex + 1 + " / " + state.photos.length : "";
+  elements.exportButton.disabled = !photo || state.busy;
+  elements.applyAll.disabled = state.photos.length < 2;
+  elements.resetCurrent.disabled = !photo;
   elements.exportCopy.textContent = state.busy
-    ? "正在处理…"
+    ? elements.status.textContent
     : state.photos.length > 1
-      ? `保存 ${state.photos.length} 张照片`
+      ? "保存全部照片"
       : "保存照片";
-}
 
-function addPhotos(files) {
-  const picked = Array.from(files).filter((file) => file.type.startsWith("image/"));
-  const room = Math.max(0, MAX_PHOTOS - state.photos.length);
-  const accepted = picked.slice(0, room).map((file) => ({
-    id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
-    file,
-    url: URL.createObjectURL(file),
-  }));
-
-  if (accepted.length) {
-    const hadPhotos = state.photos.length > 0;
-    state.photos.push(...accepted);
-    if (!hadPhotos) state.activeIndex = 0;
-    updatePhotoControls();
-    loadPreview();
-    setStatus(
-      picked.length > accepted.length
-        ? `已加入 ${accepted.length} 张；为保证手机流畅，最多处理 ${MAX_PHOTOS} 张`
-        : `已选择 ${state.photos.length} 张照片`,
-    );
-  }
-}
-
-function showNextPhoto() {
-  if (!state.photos.length) {
-    elements.input.click();
-    return;
-  }
-  if (state.photos.length > 1) state.activeIndex = (state.activeIndex + 1) % state.photos.length;
-  updatePhotoControls();
-  loadPreview();
-}
-
-function chooseFilter(filter) {
-  state.activeFilter = filter;
-  state.grain = FILTERS[filter].defaultGrain;
   elements.filters.forEach((button) => {
-    const active = button.dataset.filter === filter;
-    button.classList.toggle("active", active);
+    const active = edit.filter === button.dataset.filter;
+    button.disabled = !photo;
+    button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   });
-  updateSlider("grain");
-  drawPreview();
-}
 
-function chooseAdjustment(adjustment) {
-  state.activeAdjustment = adjustment;
   elements.adjustmentTabs.forEach((button) => {
-    const active = button.dataset.adjustment === adjustment;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-selected", String(active));
+    const id = button.dataset.adjustment;
+    const active = id === state.activeAdjustment;
+    button.disabled = !photo || (id === "strength" && !edit.filter);
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
   });
-  elements.sliderControls.forEach((control) => {
-    control.classList.toggle("active", control.dataset.slider === adjustment);
+
+  const config = sliderConfig(edit);
+  elements.sliderLabel.textContent = config.label;
+  elements.slider.min = String(config.min);
+  elements.slider.max = String(config.max);
+  elements.slider.value = String(config.value);
+  elements.slider.disabled = !photo || (state.activeAdjustment === "strength" && !edit.filter);
+  elements.sliderValue.textContent = formatValue(state.activeAdjustment, config.value);
+  const progress = ((config.value - config.min) / (config.max - config.min)) * 100;
+  elements.slider.style.setProperty("--range-progress", progress + "%");
+  renderThumbnails();
+}
+
+async function prepareSource() {
+  const photo = currentPhoto();
+  const token = ++state.loadToken;
+  state.sourceData = null;
+  if (!photo) {
+    const context = elements.canvas.getContext("2d");
+    context?.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
+    renderControls();
+    return;
+  }
+
+  try {
+    const image = await loadImage(photo.url);
+    if (token !== state.loadToken) return;
+    const scale = Math.min(1, PREVIEW_LONG_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    elements.canvas.width = width;
+    elements.canvas.height = height;
+    const context = elements.canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("Canvas unavailable");
+    context.clearRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+    state.sourceData = context.getImageData(0, 0, width, height);
+    photo.width = image.naturalWidth;
+    photo.height = image.naturalHeight;
+    setStatus("照片已载入");
+    queuePreview();
+  } catch {
+    if (token === state.loadToken) setStatus("照片载入失败，请换一张照片");
+  }
+}
+
+function queuePreview() {
+  window.cancelAnimationFrame(state.renderFrame);
+  state.renderFrame = window.requestAnimationFrame(() => {
+    const photo = currentPhoto();
+    if (!photo || !state.sourceData) return;
+    const context = elements.canvas.getContext("2d");
+    if (!context) return;
+    const pixels = state.showOriginal
+      ? new Uint8ClampedArray(state.sourceData.data)
+      : processPixels(state.sourceData, photo.edit, photo.grainSeed);
+    context.putImageData(
+      new ImageData(pixels, state.sourceData.width, state.sourceData.height),
+      0,
+      0,
+    );
   });
 }
 
-function resetAdjustments() {
-  state.strength = 100;
-  state.brightness = 0;
-  state.color = 0;
-  state.grain = FILTERS[state.activeFilter].defaultGrain;
-  updateAllSliders();
-  drawPreview();
+function selectPhoto(index) {
+  if (index < 0 || index >= state.photos.length) return;
+  state.activeIndex = index;
+  setShowOriginal(false);
+  renderControls();
+  void prepareSource();
+}
+
+function handleFiles(files) {
+  const selected = Array.from(files).filter((file) => file.type.startsWith("image/"));
+  if (!selected.length) return;
+  const room = Math.max(0, MAX_PHOTOS - state.photos.length);
+  const accepted = selected.slice(0, room);
+  if (!accepted.length) {
+    showToast("最多添加 " + MAX_PHOTOS + " 张照片");
+    return;
+  }
+  const startIndex = state.photos.length;
+  const stamp = Date.now();
+  accepted.forEach((file, index) => {
+    const id = stamp + "-" + index + "-" + file.lastModified;
+    state.photos.push({
+      id,
+      file,
+      url: URL.createObjectURL(file),
+      filename: file.name,
+      width: 0,
+      height: 0,
+      grainSeed: hashSeed(file.name + ":" + file.size + ":" + file.lastModified + ":" + id),
+      edit: createNeutralEdit(),
+    });
+  });
+  state.activeIndex = startIndex;
+  setShowOriginal(false);
+  setStatus("已添加 " + accepted.length + " 张照片");
+  renderControls();
+  void prepareSource();
+  if (accepted.length < selected.length) showToast("最多保留 " + MAX_PHOTOS + " 张照片");
+}
+
+function deleteCurrent() {
+  const photo = currentPhoto();
+  if (!photo) return;
+  URL.revokeObjectURL(photo.url);
+  state.photos.splice(state.activeIndex, 1);
+  state.activeIndex = Math.max(0, Math.min(state.activeIndex, state.photos.length - 1));
+  state.sourceData = null;
+  setShowOriginal(false);
+  renderControls();
+  void prepareSource();
+  showToast("已移除当前照片");
+}
+
+function applyToAll() {
+  const photo = currentPhoto();
+  if (!photo || state.photos.length < 2) return;
+  state.photos.forEach((item) => {
+    item.edit = { ...photo.edit };
+  });
+  setShowOriginal(false);
+  renderControls();
+  queuePreview();
+  showToast("已应用到全部照片");
+}
+
+function resetCurrent() {
+  const photo = currentPhoto();
+  if (!photo) return;
+  photo.edit = {
+    ...photo.edit,
+    strength: 100,
+    brightness: 0,
+    color: 0,
+    grain: 0,
+  };
+  setShowOriginal(false);
+  renderControls();
+  queuePreview();
+  showToast("当前照片已重置");
+}
+
+function canvasToJpeg(canvas, quality = 0.95) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("无法生成照片文件"))),
+      "image/jpeg",
+      quality,
+    );
+  });
 }
 
 async function processPhoto(photo) {
   const image = await loadImage(photo.url);
-  const scale = Math.min(1, EXPORT_LONG_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("当前浏览器无法处理照片");
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0);
   const source = context.getImageData(0, 0, canvas.width, canvas.height);
-  const frame = context.createImageData(source.width, source.height);
-  frame.data.set(processPixels(source, state.activeFilter, settings()));
-  context.putImageData(frame, 0, 0);
-  const blob = await canvasBlob(canvas);
-  const baseName = photo.file.name.replace(/\.[^.]+$/, "") || "photo";
-  return new File([blob], `${baseName}-see.jpg`, { type: "image/jpeg" });
+  const pixels = processPixels(source, photo.edit, photo.grainSeed);
+  context.putImageData(new ImageData(pixels, canvas.width, canvas.height), 0, 0);
+  const blob = await canvasToJpeg(canvas, 0.95);
+  canvas.width = 1;
+  canvas.height = 1;
+  const base = photo.filename.replace(/\.[^.]+$/, "") || "photo";
+  return new File([blob], base + "_See.jpg", {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
 }
 
-async function downloadFiles(files) {
-  for (const file of files) {
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = file.name;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    await new Promise((resolve) => window.setTimeout(resolve, 160));
-    URL.revokeObjectURL(url);
+function zipNumber(view, offset, value, bytes) {
+  if (bytes === 2) view.setUint16(offset, value, true);
+  else view.setUint32(offset, value, true);
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
   }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+async function createZip(files) {
+  const encoder = new TextEncoder();
+  const body = [];
+  const directory = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const name = encoder.encode(file.name);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const crc = crc32(bytes);
+    const local = new Uint8Array(30 + name.length);
+    const localView = new DataView(local.buffer);
+    zipNumber(localView, 0, 0x04034b50, 4);
+    zipNumber(localView, 4, 20, 2);
+    zipNumber(localView, 6, 0x0800, 2);
+    zipNumber(localView, 8, 0, 2);
+    zipNumber(localView, 14, crc, 4);
+    zipNumber(localView, 18, bytes.length, 4);
+    zipNumber(localView, 22, bytes.length, 4);
+    zipNumber(localView, 26, name.length, 2);
+    local.set(name, 30);
+    body.push(local, bytes);
+
+    const central = new Uint8Array(46 + name.length);
+    const centralView = new DataView(central.buffer);
+    zipNumber(centralView, 0, 0x02014b50, 4);
+    zipNumber(centralView, 4, 20, 2);
+    zipNumber(centralView, 6, 20, 2);
+    zipNumber(centralView, 8, 0x0800, 2);
+    zipNumber(centralView, 10, 0, 2);
+    zipNumber(centralView, 16, crc, 4);
+    zipNumber(centralView, 20, bytes.length, 4);
+    zipNumber(centralView, 24, bytes.length, 4);
+    zipNumber(centralView, 28, name.length, 2);
+    zipNumber(centralView, 42, offset, 4);
+    central.set(name, 46);
+    directory.push(central);
+    offset += local.length + bytes.length;
+  }
+
+  const directorySize = directory.reduce((sum, bytes) => sum + bytes.length, 0);
+  const end = new Uint8Array(22);
+  const endView = new DataView(end.buffer);
+  zipNumber(endView, 0, 0x06054b50, 4);
+  zipNumber(endView, 8, files.length, 2);
+  zipNumber(endView, 10, files.length, 2);
+  zipNumber(endView, 12, directorySize, 4);
+  zipNumber(endView, 16, offset, 4);
+  return new Blob([...body, ...directory, end], { type: "application/zip" });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function exportPhotos() {
-  if (!state.photos.length) {
-    setStatus("请先选择一张或多张手机照片");
-    return;
-  }
-
+  if (!state.photos.length || state.busy) return;
+  setShowOriginal(false);
   state.busy = true;
-  elements.exportButton.disabled = true;
-  updatePhotoControls();
+  renderControls();
+
   try {
     const files = [];
     for (let index = 0; index < state.photos.length; index += 1) {
-      setStatus(`正在处理 ${index + 1} / ${state.photos.length}…`);
+      setStatus("正在处理 " + (index + 1) + " / " + state.photos.length);
+      elements.exportCopy.textContent = elements.status.textContent;
       files.push(await processPhoto(state.photos[index]));
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
     }
 
-    const shareData = { files, title: "See", text: `使用 ${FILTERS[state.activeFilter].name} 处理` };
-    const canShare = typeof navigator.share === "function"
-      && (typeof navigator.canShare !== "function" || navigator.canShare(shareData));
-
-    if (canShare) {
-      try {
-        await navigator.share(shareData);
-        setStatus(`已处理 ${files.length} 张，可在分享面板中存到“照片”`);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          setStatus("已取消分享，照片没有上传");
-        } else {
-          await downloadFiles(files);
-          setStatus(`已下载 ${files.length} 张照片`);
-        }
-      }
+    const shareData = { files, title: "See", text: "See 处理的照片" };
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      await navigator.share(shareData);
+      setStatus("照片已分享");
+    } else if (files.length === 1) {
+      downloadBlob(files[0], files[0].name);
+      setStatus("照片已保存");
     } else {
-      await downloadFiles(files);
-      setStatus(`已下载 ${files.length} 张照片`);
+      downloadBlob(await createZip(files), "See_Photos.zip");
+      setStatus("照片包已保存");
     }
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : "处理失败，请减少照片数量后重试");
+    if (error?.name === "AbortError") setStatus("已取消分享");
+    else setStatus("保存失败，请减少照片数量后重试");
   } finally {
     state.busy = false;
-    elements.exportButton.disabled = false;
-    updatePhotoControls();
+    renderControls();
   }
 }
 
+elements.emptyUpload.addEventListener("click", () => elements.input.click());
 elements.input.addEventListener("change", (event) => {
-  addPhotos(event.target.files || []);
+  handleFiles(event.target.files);
   event.target.value = "";
 });
-elements.photoCount.addEventListener("click", showNextPhoto);
-elements.resetButton.addEventListener("click", resetAdjustments);
+elements.compareButton.addEventListener("click", () => setShowOriginal(!state.showOriginal));
+elements.deleteButton.addEventListener("click", deleteCurrent);
+elements.applyAll.addEventListener("click", applyToAll);
+elements.resetCurrent.addEventListener("click", resetCurrent);
 elements.exportButton.addEventListener("click", exportPhotos);
+
 elements.filters.forEach((button) => {
-  button.addEventListener("click", () => chooseFilter(button.dataset.filter));
-});
-elements.adjustmentTabs.forEach((button) => {
-  button.addEventListener("click", () => chooseAdjustment(button.dataset.adjustment));
+  button.addEventListener("click", () => updateCurrentEdit({ filter: button.dataset.filter }));
 });
 
-Object.keys(elements.sliders).forEach((name) => {
-  elements.sliders[name].addEventListener("input", (event) => {
-    state[name] = Number(event.target.value);
-    updateSlider(name);
-    drawPreview();
+elements.adjustmentTabs.forEach((button) => {
+  button.addEventListener("click", () => {
+    const photo = currentPhoto();
+    if (!photo || (button.dataset.adjustment === "strength" && !photo.edit.filter)) return;
+    state.activeAdjustment = button.dataset.adjustment;
+    setShowOriginal(false);
+    renderControls();
   });
 });
 
-function showOriginal() {
-  state.comparing = true;
-  drawPreview();
-}
-
-function showFilter() {
-  state.comparing = false;
-  drawPreview();
-}
-
-elements.compareButton.addEventListener("pointerdown", showOriginal);
-elements.compareButton.addEventListener("pointerup", showFilter);
-elements.compareButton.addEventListener("pointercancel", showFilter);
-elements.compareButton.addEventListener("pointerleave", showFilter);
-elements.compareButton.addEventListener("keydown", (event) => {
-  if (event.key === " " || event.key === "Enter") showOriginal();
+elements.slider.addEventListener("input", (event) => {
+  updateCurrentEdit({ [state.activeAdjustment]: Number(event.target.value) });
 });
-elements.compareButton.addEventListener("keyup", showFilter);
 
-window.addEventListener("pagehide", () => {
+document.querySelector(".interaction-surface").addEventListener("contextmenu", (event) => {
+  if (event.target.closest("button, canvas, img")) event.preventDefault();
+});
+
+document.querySelector(".interaction-surface").addEventListener("dragstart", (event) => {
+  if (event.target.closest("img")) event.preventDefault();
+});
+
+window.addEventListener("beforeunload", () => {
   state.photos.forEach((photo) => URL.revokeObjectURL(photo.url));
 });
 
-if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("./sw.js?v=8").catch(() => {});
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js?v=12", { scope: "./" }).catch(() => {});
+  });
 }
 
-updateAllSliders();
-updatePhotoControls();
-loadPreview();
+renderControls();

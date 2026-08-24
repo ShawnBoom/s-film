@@ -19,74 +19,80 @@
     <meta name="twitter:description" content="不登录、不上传，在手机本地为照片添加胶片质感。" />
     <meta name="twitter:image" content="https://shawnboom.github.io/s-film/og.png" />
     <title>See｜手机胶片滤镜</title>
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=8" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=12" />
     <link rel="apple-touch-icon" sizes="120x120" href="./icons/see-apple-touch-icon-120.png" />
     <link rel="apple-touch-icon" sizes="152x152" href="./icons/see-apple-touch-icon-152.png" />
     <link rel="apple-touch-icon" sizes="167x167" href="./icons/see-apple-touch-icon-167.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/see-apple-touch-icon-180.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/see-icon-192.png" />
-    <link rel="manifest" href="./manifest.webmanifest?v=8" />
-    <link rel="stylesheet" href="./styles.css?v=8" />
-    <script src="./app.js?v=8" defer></script>
+    <link rel="manifest" href="./manifest.webmanifest?v=12" />
+    <link rel="stylesheet" href="./styles.css?v=12" />
+    <script type="module" src="./app.js?v=12"></script>
   </head>
   <body>
     <main class="app-shell">
-      <header class="topbar">
-        <div class="brand">
-          <img src="./see-logo.png" width="1306" height="591" alt="See" />
-        </div>
-        <div class="privacy-pill"><span></span> 照片仅在本机处理</div>
-      </header>
+      <section class="editor-card interaction-surface" aria-label="See 照片滤镜">
+        <header class="topbar">
+          <img class="brand-logo" src="./see-logo.png" width="1306" height="591" alt="See" draggable="false" />
+        </header>
 
-      <section class="editor">
-        <div class="photo-frame">
-          <canvas id="preview" aria-label="滤镜实时预览"></canvas>
-          <label class="photo-picker" aria-label="选择手机照片">
-            <input id="photo-input" type="file" accept="image/*" multiple />
-          </label>
-          <button type="button" class="compare-button" id="compare-button">按住看原图</button>
-          <button type="button" class="photo-count" id="photo-count">轻点选照片</button>
-        </div>
+        <section class="photo-stage" id="photo-stage">
+          <canvas id="preview" class="preview-canvas" aria-label="照片滤镜预览"></canvas>
+          <button class="empty-upload" id="empty-upload" type="button">添加照片</button>
+          <button class="compare-button" id="compare-button" type="button" hidden>查看原图</button>
+          <button class="delete-button" id="delete-button" type="button" aria-label="删除当前照片" hidden>×</button>
+          <span class="photo-count" id="photo-count" hidden></span>
+        </section>
 
-        <div class="filter-strip" aria-label="选择滤镜">
-          <button type="button" class="active" data-filter="classic" aria-pressed="true" aria-label="#S01，FUJI Classic Chrome"><strong>#S01</strong></button>
-          <button type="button" data-filter="gold" aria-pressed="false" aria-label="#S02，KODAK Gold 200"><strong>#S02</strong></button>
-          <button type="button" data-filter="youth" aria-pressed="false" aria-label="#S03，FUJI Youth Blue"><strong>#S03</strong></button>
-        </div>
+        <section class="thumbnail-rail" id="thumbnail-rail" aria-label="照片列表">
+          <button class="thumbnail add-photo" id="add-photo" type="button" aria-label="添加照片">+</button>
+        </section>
 
-        <div class="adjustments">
-          <div class="adjustment-tabs" role="tablist" aria-label="微调项目">
-            <button type="button" role="tab" aria-selected="true" class="active" data-adjustment="strength">浓度</button>
-            <button type="button" role="tab" aria-selected="false" data-adjustment="brightness">亮度</button>
-            <button type="button" role="tab" aria-selected="false" data-adjustment="color">色彩</button>
-            <button type="button" role="tab" aria-selected="false" data-adjustment="grain">颗粒</button>
+        <input class="visually-hidden" id="photo-input" type="file" accept="image/*" multiple />
+
+        <section class="filter-row" aria-label="滤镜">
+          <button class="filter-button" type="button" data-filter="classic" aria-pressed="false" aria-label="#S01 FUJI Classic Chrome" disabled>#S01</button>
+          <button class="filter-button" type="button" data-filter="gold" aria-pressed="false" aria-label="#S02 KODAK Gold 200" disabled>#S02</button>
+          <button class="filter-button" type="button" data-filter="youth" aria-pressed="false" aria-label="#S03 FUJI Youth Blue" disabled>#S03</button>
+        </section>
+
+        <section class="adjustment-panel">
+          <nav class="adjustment-tabs" aria-label="微调项目">
+            <button class="adjustment-tab" type="button" data-adjustment="strength" aria-pressed="false" disabled>浓度</button>
+            <button class="adjustment-tab is-active" type="button" data-adjustment="brightness" aria-pressed="true" disabled>亮度</button>
+            <button class="adjustment-tab" type="button" data-adjustment="color" aria-pressed="false" disabled>色彩</button>
+            <button class="adjustment-tab" type="button" data-adjustment="grain" aria-pressed="false" disabled>颗粒</button>
+          </nav>
+          <div class="slider-block">
+            <div class="slider-meta">
+              <label id="slider-label" for="active-adjustment">亮度</label>
+              <output id="slider-value">0</output>
+            </div>
+            <input
+              id="active-adjustment"
+              class="range-control"
+              type="range"
+              min="-100"
+              max="100"
+              value="0"
+              disabled
+              style="--range-progress: 50%"
+            />
           </div>
+        </section>
 
-          <div class="adjustment-list">
-            <label class="slider-control active" data-slider="strength">
-              <span class="control-label"><span>浓度</span><strong id="strength-value">100</strong></span>
-              <input id="strength" aria-label="浓度" type="range" min="0" max="100" value="100" />
-            </label>
-            <label class="slider-control" data-slider="brightness">
-              <span class="control-label"><span>亮度</span><strong id="brightness-value">0</strong></span>
-              <input id="brightness" aria-label="亮度" type="range" min="-25" max="25" value="0" />
-            </label>
-            <label class="slider-control" data-slider="color">
-              <span class="control-label"><span>色彩</span><strong id="color-value">0</strong></span>
-              <input id="color" aria-label="色彩" type="range" min="-30" max="30" value="0" />
-            </label>
-            <label class="slider-control" data-slider="grain">
-              <span class="control-label"><span>颗粒</span><strong id="grain-value">8</strong></span>
-              <input id="grain" aria-label="颗粒" type="range" min="0" max="30" value="8" />
-            </label>
-          </div>
+        <div class="secondary-actions">
+          <button id="apply-all" type="button" disabled>应用到全部</button>
+          <button id="reset-current" type="button" disabled>重置当前</button>
         </div>
 
-        <button class="primary-button" id="export-button" type="button">
-          <span id="export-copy">保存照片</span><span aria-hidden="true">→</span>
+        <button class="save-button" id="export-button" type="button" disabled>
+          <span id="export-copy">保存照片</span><span class="save-arrow" aria-hidden="true">→</span>
         </button>
-        <button type="button" class="reset-button" id="reset-button">还原微调</button>
-        <p class="status-line" id="status-line" role="status">示例预览 · 轻点照片选择你的照片</p>
+
+        <p class="privacy-note"><span aria-hidden="true"></span>照片仅在本机处理</p>
+        <p class="visually-hidden" id="status-line" role="status" aria-live="polite">等待添加照片</p>
+        <div class="toast" id="toast" role="status" hidden></div>
       </section>
     </main>
   </body>

@@ -1,418 +1,609 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChangeEvent, CSSProperties, KeyboardEvent } from "react";
+/* Blob-backed thumbnails and the supplied transparent wordmark intentionally use native images. */
+/* eslint-disable @next/next/no-img-element */
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, CSSProperties } from "react";
+import { hashSeed, processPixels } from "../lib/image-engine.js";
 
 const FILTERS = [
-  { id: "classic", label: "#S01", name: "FUJI Classic Chrome", note: "克制 · 青灰 · 安静", defaultGrain: 8 },
-  { id: "gold", label: "#S02", name: "KODAK Gold 200", note: "暖阳 · 鲜活 · 怀旧", defaultGrain: 11 },
-  { id: "youth", label: "#S03", name: "FUJI Youth Blue", note: "蓝天 · 街头 · 自由", defaultGrain: 7 },
+  { id: "classic", label: "#S01", name: "FUJI Classic Chrome" },
+  { id: "gold", label: "#S02", name: "KODAK Gold 200" },
+  { id: "youth", label: "#S03", name: "FUJI Youth Blue" },
 ] as const;
 
 type FilterId = (typeof FILTERS)[number]["id"];
-type PhotoItem = { id: string; file: File; url: string };
-type Adjustments = { strength: number; brightness: number; color: number; grain: number };
-type AdjustmentId = keyof Adjustments;
+type AdjustmentId = "strength" | "brightness" | "color" | "grain";
+type EditState = {
+  filter: FilterId | null;
+  strength: number;
+  brightness: number;
+  color: number;
+  grain: number;
+};
+type PhotoItem = {
+  id: string;
+  file: File;
+  url: string;
+  filename: string;
+  width: number;
+  height: number;
+  grainSeed: number;
+  edit: EditState;
+};
 
 const MAX_PHOTOS = 20;
-const PREVIEW_LONG_EDGE = 1400;
-const EXPORT_LONG_EDGE = 5000;
+const PREVIEW_LONG_EDGE = 960;
 
-function clamp(value: number) {
-  return Math.max(0, Math.min(255, value));
+function createNeutralEdit(): EditState {
+  return { filter: null, strength: 100, brightness: 0, color: 0, grain: 0 };
 }
 
-function saturation(r: number, g: number, b: number, amount: number) {
-  const lightness = r * 0.299 + g * 0.587 + b * 0.114;
-  return [
-    lightness + (r - lightness) * amount,
-    lightness + (g - lightness) * amount,
-    lightness + (b - lightness) * amount,
-  ];
+async function loadImage(url: string) {
+  const image = new Image();
+  image.decoding = "async";
+  image.src = url;
+  await image.decode();
+  return image;
 }
 
-function processPixels(source: ImageData, filter: FilterId, settings: Adjustments) {
-  const output = new Uint8ClampedArray(source.data.length);
-  const mix = settings.strength / 100;
-  const brightnessShift = settings.brightness * 1.7;
-  const colorAmount = 1 + settings.color / 100;
-
-  for (let i = 0; i < source.data.length; i += 4) {
-    const r = source.data[i];
-    const g = source.data[i + 1];
-    const b = source.data[i + 2];
-    let rr = r;
-    let gg = g;
-    let bb = b;
-
-    if (filter === "classic") {
-      [rr, gg, bb] = saturation(r, g, b, 0.76);
-      rr = (rr - 128) * 1.04 + 127;
-      gg = (gg - 128) * 1.02 + 130;
-      bb = (bb - 128) * 0.98 + 134;
-      rr *= 0.97;
-      gg *= 0.99;
-    } else if (filter === "gold") {
-      [rr, gg, bb] = saturation(r, g, b, 1.1);
-      rr = (rr - 128) * 1.04 + 141;
-      gg = (gg - 128) * 1.02 + 134;
-      bb = (bb - 128) * 0.94 + 123;
-    } else {
-      [rr, gg, bb] = saturation(r, g, b, 1.16);
-      rr = (rr - 128) * 1.05 + 129;
-      gg = (gg - 128) * 1.06 + 132;
-      bb = (bb - 128) * 1.08 + 139;
-    }
-
-    rr = r + (rr - r) * mix + brightnessShift;
-    gg = g + (gg - g) * mix + brightnessShift;
-    bb = b + (bb - b) * mix + brightnessShift;
-    [rr, gg, bb] = saturation(rr, gg, bb, colorAmount);
-
-    const pixel = i >> 2;
-    const hash = (Math.imul(pixel + 17, 1103515245) + 12345) >>> 0;
-    const noise = (((hash & 1023) / 1023) - 0.5) * settings.grain * 1.35;
-
-    output[i] = clamp(rr + noise);
-    output[i + 1] = clamp(gg + noise);
-    output[i + 2] = clamp(bb + noise);
-    output[i + 3] = source.data[i + 3];
-  }
-
-  return output;
-}
-
-function loadImage(url: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("无法读取这张照片"));
-    image.src = url;
-  });
-}
-
-function canvasBlob(canvas: HTMLCanvasElement) {
+function canvasToJpeg(canvas: HTMLCanvasElement, quality = 0.95) {
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("照片导出失败"))),
+      (blob) => (blob ? resolve(blob) : reject(new Error("无法生成照片文件"))),
       "image/jpeg",
-      0.92,
+      quality,
     );
   });
 }
 
-function rangeStyle(progress: number) {
-  return { "--range-progress": `${progress}%` } as CSSProperties;
+function rangeStyle(value: number, min: number, max: number): CSSProperties {
+  const progress = ((value - min) / (max - min)) * 100;
+  return { "--range-progress": progress + "%" } as CSSProperties;
+}
+
+function signed(value: number) {
+  return value > 0 ? "+" + value : String(value);
+}
+
+function zipNumber(view: DataView, offset: number, value: number, bytes: number) {
+  if (bytes === 2) view.setUint16(offset, value, true);
+  else view.setUint32(offset, value, true);
+}
+
+function crc32(bytes: Uint8Array) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+async function createZip(files: File[]) {
+  const encoder = new TextEncoder();
+  const body: BlobPart[] = [];
+  const directory: BlobPart[] = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const name = encoder.encode(file.name);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const crc = crc32(bytes);
+    const local = new Uint8Array(30 + name.length);
+    const localView = new DataView(local.buffer);
+    zipNumber(localView, 0, 0x04034b50, 4);
+    zipNumber(localView, 4, 20, 2);
+    zipNumber(localView, 6, 0x0800, 2);
+    zipNumber(localView, 8, 0, 2);
+    zipNumber(localView, 14, crc, 4);
+    zipNumber(localView, 18, bytes.length, 4);
+    zipNumber(localView, 22, bytes.length, 4);
+    zipNumber(localView, 26, name.length, 2);
+    local.set(name, 30);
+    body.push(local, bytes);
+
+    const central = new Uint8Array(46 + name.length);
+    const centralView = new DataView(central.buffer);
+    zipNumber(centralView, 0, 0x02014b50, 4);
+    zipNumber(centralView, 4, 20, 2);
+    zipNumber(centralView, 6, 20, 2);
+    zipNumber(centralView, 8, 0x0800, 2);
+    zipNumber(centralView, 10, 0, 2);
+    zipNumber(centralView, 16, crc, 4);
+    zipNumber(centralView, 20, bytes.length, 4);
+    zipNumber(centralView, 24, bytes.length, 4);
+    zipNumber(centralView, 28, name.length, 2);
+    zipNumber(centralView, 42, offset, 4);
+    central.set(name, 46);
+    directory.push(central);
+    offset += local.length + bytes.length;
+  }
+
+  const directorySize = directory.reduce(
+    (sum, part) => sum + (part as Uint8Array).byteLength,
+    0,
+  );
+  const end = new Uint8Array(22);
+  const endView = new DataView(end.buffer);
+  zipNumber(endView, 0, 0x06054b50, 4);
+  zipNumber(endView, 8, files.length, 2);
+  zipNumber(endView, 10, files.length, 2);
+  zipNumber(endView, 12, directorySize, 4);
+  zipNumber(endView, 16, offset, 4);
+  return new Blob([...body, ...directory, end], { type: "application/zip" });
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function Home() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [activeFilter, setActiveFilter] = useState<FilterId>("classic");
-  const [strength, setStrength] = useState(100);
-  const [brightness, setBrightness] = useState(0);
-  const [color, setColor] = useState(0);
-  const [grain, setGrain] = useState(8);
-  const [activeAdjustment, setActiveAdjustment] = useState<AdjustmentId>("strength");
+  const [activeAdjustment, setActiveAdjustment] =
+    useState<AdjustmentId>("brightness");
   const [sourceVersion, setSourceVersion] = useState(0);
-  const [comparing, setComparing] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("准备好了");
+  const [status, setStatus] = useState("等待添加照片");
+  const [toast, setToast] = useState("");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const sourceDataRef = useRef<ImageData | null>(null);
-  const objectUrlsRef = useRef<string[]>([]);
-  const sourceUrl = photos[activeIndex]?.url ?? "/see-cover.png";
-  const selectedName = FILTERS.find((item) => item.id === activeFilter)?.name;
+  const renderFrameRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const photosRef = useRef<PhotoItem[]>([]);
+
+  const currentPhoto = photos[activeIndex] ?? null;
+  const currentEdit = currentPhoto?.edit ?? createNeutralEdit();
+  const currentPhotoId = currentPhoto?.id ?? "";
+  const sourceUrl = currentPhoto?.url ?? "";
+
+  const adjustmentConfig = useMemo(() => {
+    if (activeAdjustment === "strength") {
+      return {
+        label: "浓度",
+        min: 0,
+        max: 100,
+        value: currentEdit.strength,
+        display: currentEdit.strength + "%",
+        disabled: !currentPhoto || !currentEdit.filter,
+      };
+    }
+    if (activeAdjustment === "brightness") {
+      return {
+        label: "亮度",
+        min: -100,
+        max: 100,
+        value: currentEdit.brightness,
+        display: signed(currentEdit.brightness),
+        disabled: !currentPhoto,
+      };
+    }
+    if (activeAdjustment === "color") {
+      return {
+        label: "色彩",
+        min: -100,
+        max: 100,
+        value: currentEdit.color,
+        display: signed(currentEdit.color),
+        disabled: !currentPhoto,
+      };
+    }
+    return {
+      label: "颗粒",
+      min: 0,
+      max: 100,
+      value: currentEdit.grain,
+      display: String(currentEdit.grain),
+      disabled: !currentPhoto,
+    };
+  }, [activeAdjustment, currentEdit, currentPhoto]);
 
   useEffect(() => {
-    return () => objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    photosRef.current = photos;
+  }, [photos]);
+
+  useEffect(() => {
+    return () => {
+      for (const photo of photosRef.current) URL.revokeObjectURL(photo.url);
+      if (renderFrameRef.current) cancelAnimationFrame(renderFrameRef.current);
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    loadImage(sourceUrl)
-      .then((image) => {
-        if (cancelled || !canvasRef.current) return;
-        const canvas = canvasRef.current;
+    sourceDataRef.current = null;
+
+    async function prepareSource() {
+      const canvas = canvasRef.current;
+      if (!canvas || !currentPhotoId) return;
+
+      try {
+        const image = await loadImage(sourceUrl);
+        if (cancelled) return;
         const scale = Math.min(1, PREVIEW_LONG_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
-        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.width = width;
+        canvas.height = height;
         const context = canvas.getContext("2d", { willReadFrequently: true });
-        if (!context) return;
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = "high";
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        sourceDataRef.current = context.getImageData(0, 0, canvas.width, canvas.height);
+        if (!context) throw new Error("当前浏览器无法处理照片");
+        context.clearRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+        sourceDataRef.current = context.getImageData(0, 0, width, height);
+        setPhotos((items) =>
+          items.map((item) =>
+            item.id === currentPhotoId
+              ? { ...item, width: image.naturalWidth, height: image.naturalHeight }
+              : item,
+          ),
+        );
         setSourceVersion((version) => version + 1);
-        setStatus(photos.length ? `已选择 ${photos.length} 张照片` : "示例预览 · 请选择你的照片");
-      })
-      .catch(() => setStatus("这张照片暂时无法读取，请换一张试试"));
+        setStatus("照片已载入");
+      } catch {
+        if (!cancelled) setStatus("照片载入失败，请换一张照片");
+      }
+    }
+
+    void prepareSource();
     return () => {
       cancelled = true;
     };
-  }, [sourceUrl, photos.length]);
+  }, [currentPhotoId, sourceUrl]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const source = sourceDataRef.current;
-    if (!canvas || !source) return;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) return;
-    const frame = context.createImageData(source.width, source.height);
-    frame.data.set(
-      comparing || photos.length === 0
-        ? source.data
-        : processPixels(source, activeFilter, { strength, brightness, color, grain }),
-    );
-    context.putImageData(frame, 0, 0);
-  }, [activeFilter, brightness, color, comparing, grain, photos.length, sourceVersion, strength]);
-
-  const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
-    const room = Math.max(0, MAX_PHOTOS - photos.length);
-    const accepted = picked.slice(0, room).map((file) => {
-      const url = URL.createObjectURL(file);
-      objectUrlsRef.current.push(url);
-      return { id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`, file, url };
+    if (renderFrameRef.current) cancelAnimationFrame(renderFrameRef.current);
+    renderFrameRef.current = requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      const source = sourceDataRef.current;
+      if (!canvas || !source || !currentPhoto) return;
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      const pixels = showOriginal
+        ? new Uint8ClampedArray(source.data)
+        : processPixels(source, currentEdit, currentPhoto.grainSeed);
+      context.putImageData(new ImageData(pixels, source.width, source.height), 0, 0);
     });
+    return () => {
+      if (renderFrameRef.current) cancelAnimationFrame(renderFrameRef.current);
+    };
+  }, [currentPhoto, currentEdit, showOriginal, sourceVersion]);
 
-    if (accepted.length) {
-      const hadPhotos = photos.length > 0;
-      setPhotos((current) => [...current, ...accepted]);
-      if (!hadPhotos) setActiveIndex(0);
-      setStatus(
-        picked.length > accepted.length
-          ? `已加入 ${accepted.length} 张；为保证手机流畅，最多处理 ${MAX_PHOTOS} 张`
-          : `已选择 ${photos.length + accepted.length} 张照片`,
-      );
-    }
-    event.target.value = "";
-  };
+  function showToast(message: string) {
+    setToast(message);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(""), 1800);
+  }
 
-  const showNextPhoto = () => {
-    if (photos.length > 1) setActiveIndex((index) => (index + 1) % photos.length);
-  };
+  function updateCurrentEdit(patch: Partial<EditState>) {
+    if (!currentPhoto) return;
+    setShowOriginal(false);
+    setPhotos((items) =>
+      items.map((item, index) =>
+        index === activeIndex ? { ...item, edit: { ...item.edit, ...patch } } : item,
+      ),
+    );
+  }
 
-  const chooseFilter = (id: FilterId) => {
-    setActiveFilter(id);
-    setGrain(FILTERS.find((item) => item.id === id)?.defaultGrain ?? 8);
-  };
-
-  const processPhoto = useCallback(async (photo: PhotoItem) => {
-    const image = await loadImage(photo.url);
-    const scale = Math.min(1, EXPORT_LONG_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("当前浏览器无法处理照片");
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const source = context.getImageData(0, 0, canvas.width, canvas.height);
-    const frame = context.createImageData(source.width, source.height);
-    frame.data.set(processPixels(source, activeFilter, { strength, brightness, color, grain }));
-    context.putImageData(frame, 0, 0);
-    const blob = await canvasBlob(canvas);
-    const baseName = photo.file.name.replace(/\.[^.]+$/, "") || "photo";
-    return new File([blob], `${baseName}-see.jpg`, { type: "image/jpeg" });
-  }, [activeFilter, brightness, color, grain, strength]);
-
-  const downloadFiles = async (files: File[]) => {
-    for (const file of files) {
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      await new Promise((resolve) => window.setTimeout(resolve, 160));
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  const exportPhotos = async () => {
-    if (!photos.length) {
-      setStatus("请先选择一张或多张手机照片");
+  function handleFiles(event: ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(event.target.files ?? []).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+    if (!selected.length) return;
+    const room = Math.max(0, MAX_PHOTOS - photos.length);
+    const accepted = selected.slice(0, room);
+    if (!accepted.length) {
+      showToast("最多添加 " + MAX_PHOTOS + " 张照片");
+      event.target.value = "";
       return;
     }
+    const stamp = Date.now();
+    const incoming = accepted.map((file, index) => {
+      const id = stamp + "-" + index + "-" + file.lastModified;
+      return {
+        id,
+        file,
+        url: URL.createObjectURL(file),
+        filename: file.name,
+        width: 0,
+        height: 0,
+        grainSeed: hashSeed(file.name + ":" + file.size + ":" + file.lastModified + ":" + id),
+        edit: createNeutralEdit(),
+      };
+    });
+    setPhotos((items) => [...items, ...incoming]);
+    setActiveIndex(photos.length);
+    setShowOriginal(false);
+    setStatus("已添加 " + incoming.length + " 张照片");
+    event.target.value = "";
+    if (accepted.length < selected.length) showToast("最多保留 " + MAX_PHOTOS + " 张照片");
+  }
 
+  function selectPhoto(index: number) {
+    setActiveIndex(index);
+    setShowOriginal(false);
+  }
+
+  function deleteCurrent() {
+    if (!currentPhoto) return;
+    URL.revokeObjectURL(currentPhoto.url);
+    const remaining = photos.filter((_, index) => index !== activeIndex);
+    setPhotos(remaining);
+    setActiveIndex(Math.max(0, Math.min(activeIndex, remaining.length - 1)));
+    setShowOriginal(false);
+    sourceDataRef.current = null;
+    showToast("已移除当前照片");
+  }
+
+  function applyToAll() {
+    if (!currentPhoto || photos.length < 2) return;
+    const edit = { ...currentPhoto.edit };
+    setPhotos((items) => items.map((item) => ({ ...item, edit: { ...edit } })));
+    setShowOriginal(false);
+    showToast("已应用到全部照片");
+  }
+
+  function resetCurrent() {
+    if (!currentPhoto) return;
+    updateCurrentEdit({
+      strength: 100,
+      brightness: 0,
+      color: 0,
+      grain: 0,
+    });
+    showToast("当前照片已重置");
+  }
+
+  async function processPhoto(photo: PhotoItem) {
+    const image = await loadImage(photo.url);
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("当前浏览器无法处理照片");
+    context.drawImage(image, 0, 0);
+    const source = context.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = processPixels(source, photo.edit, photo.grainSeed);
+    context.putImageData(new ImageData(pixels, canvas.width, canvas.height), 0, 0);
+    const blob = await canvasToJpeg(canvas, 0.95);
+    canvas.width = 1;
+    canvas.height = 1;
+    const base = photo.filename.replace(/\.[^.]+$/, "") || "photo";
+    return new File([blob], base + "_See.jpg", {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  }
+
+  async function exportPhotos() {
+    if (!photos.length || busy) return;
+    setShowOriginal(false);
     setBusy(true);
+    setStatus("正在处理 1 / " + photos.length);
+
     try {
       const files: File[] = [];
       for (let index = 0; index < photos.length; index += 1) {
-        setStatus(`正在处理 ${index + 1} / ${photos.length}…`);
+        setStatus("正在处理 " + (index + 1) + " / " + photos.length);
         files.push(await processPhoto(photos[index]));
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
 
-      const shareData = { files, title: "See", text: `使用 ${selectedName} 处理` };
-      const canShare = typeof navigator.share === "function"
-        && (typeof navigator.canShare !== "function" || navigator.canShare(shareData));
-
-      if (canShare) {
-        try {
-          await navigator.share(shareData);
-          setStatus(`已处理 ${files.length} 张，可在分享面板中存到“照片”`);
-        } catch (error) {
-          if (error instanceof DOMException && error.name === "AbortError") {
-            setStatus("已取消分享，照片没有上传");
-          } else {
-            await downloadFiles(files);
-            setStatus(`已下载 ${files.length} 张照片`);
-          }
-        }
+      const shareData = { files, title: "See", text: "See 处理的照片" };
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+        setStatus("照片已分享");
+      } else if (files.length === 1) {
+        downloadBlob(files[0], files[0].name);
+        setStatus("照片已保存");
       } else {
-        await downloadFiles(files);
-        setStatus(`已下载 ${files.length} 张照片`);
+        const zip = await createZip(files);
+        downloadBlob(zip, "See_Photos.zip");
+        setStatus("照片包已保存");
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "处理失败，请减少照片数量后重试");
+      if ((error as DOMException)?.name === "AbortError") {
+        setStatus("已取消分享");
+      } else {
+        setStatus("保存失败，请减少照片数量后重试");
+      }
     } finally {
       setBusy(false);
     }
-  };
-
-  const compareKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === " " || event.key === "Enter") setComparing(true);
-  };
-
-  const adjustmentControls = {
-    strength: {
-      label: "浓度",
-      value: strength,
-      min: 0,
-      max: 100,
-      progress: strength,
-      setValue: setStrength,
-    },
-    brightness: {
-      label: "亮度",
-      value: brightness,
-      min: -25,
-      max: 25,
-      progress: (brightness + 25) * 2,
-      setValue: setBrightness,
-    },
-    color: {
-      label: "色彩",
-      value: color,
-      min: -30,
-      max: 30,
-      progress: ((color + 30) / 60) * 100,
-      setValue: setColor,
-    },
-    grain: {
-      label: "颗粒",
-      value: grain,
-      min: 0,
-      max: 30,
-      progress: (grain / 30) * 100,
-      setValue: setGrain,
-    },
-  } satisfies Record<AdjustmentId, {
-    label: string;
-    value: number;
-    min: number;
-    max: number;
-    progress: number;
-    setValue: (value: number) => void;
-  }>;
-  const currentAdjustment = adjustmentControls[activeAdjustment];
-  const displayAdjustmentValue = ["brightness", "color"].includes(activeAdjustment) && currentAdjustment.value > 0
-    ? `+${currentAdjustment.value}`
-    : currentAdjustment.value;
+  }
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div className="brand">
-          <img src="/see-logo.png" width="1306" height="591" alt="See" />
-        </div>
-        <div className="privacy-pill"><span /> 照片仅在本机处理</div>
-      </header>
+      <section className="editor-card interaction-surface" aria-label="See 照片滤镜">
+        <header className="topbar">
+          <img className="brand-logo" src="/see-logo.png" alt="See" draggable="false" />
+        </header>
 
-      <section className="editor">
-        <div className="photo-frame">
-          <canvas ref={canvasRef} aria-label="滤镜实时预览" />
-          <label className="photo-picker" aria-label={photos.length ? "继续添加照片" : "选择手机照片"}>
-            <input type="file" accept="image/*" multiple onChange={handleFiles} />
-          </label>
-          <button
-            type="button"
-            className="compare-button"
-            onPointerDown={() => setComparing(true)}
-            onPointerUp={() => setComparing(false)}
-            onPointerCancel={() => setComparing(false)}
-            onPointerLeave={() => setComparing(false)}
-            onKeyDown={compareKeyDown}
-            onKeyUp={() => setComparing(false)}
-          >
-            按住看原图
-          </button>
-          {photos.length ? (
-            <button type="button" className="photo-count" onClick={showNextPhoto} aria-label={photos.length > 1 ? "查看下一张照片" : "已选择一张照片"}>
-              {activeIndex + 1} / {photos.length}
-            </button>
-          ) : (
-            <span className="photo-count photo-count-label">轻点选照片</span>
-          )}
-        </div>
+        <section className={"photo-stage" + (currentPhoto ? " has-photo" : "")}>
+          <canvas
+            ref={canvasRef}
+            className="preview-canvas"
+            aria-label="照片滤镜预览"
+            onContextMenu={(event) => event.preventDefault()}
+          />
 
-        <div className="filter-strip" aria-label="选择滤镜">
-          {FILTERS.map((filter) => (
+          {!currentPhoto && (
             <button
-              key={filter.id}
+              className="empty-upload"
               type="button"
-              className={activeFilter === filter.id ? "active" : ""}
-              aria-pressed={activeFilter === filter.id}
-              aria-label={`${filter.label}，${filter.name}`}
-              onClick={() => chooseFilter(filter.id)}
+              onClick={() => inputRef.current?.click()}
             >
-              <strong>{filter.label}</strong>
+              添加照片
+            </button>
+          )}
+
+          {currentPhoto && (
+            <>
+              <button
+                className={"compare-button" + (showOriginal ? " is-active" : "")}
+                type="button"
+                aria-pressed={showOriginal}
+                onClick={() => setShowOriginal((value) => !value)}
+              >
+                {showOriginal ? "查看效果" : "查看原图"}
+              </button>
+              <button
+                className="delete-button"
+                type="button"
+                aria-label="删除当前照片"
+                onClick={deleteCurrent}
+              >
+                ×
+              </button>
+              <span className="photo-count" aria-hidden="true">
+                {activeIndex + 1} / {photos.length}
+              </span>
+            </>
+          )}
+        </section>
+
+        <section className="thumbnail-rail" aria-label="照片列表">
+          {photos.map((photo, index) => (
+            <button
+              className={"thumbnail" + (index === activeIndex ? " is-active" : "")}
+              type="button"
+              key={photo.id}
+              aria-label={"选择第 " + (index + 1) + " 张照片"}
+              aria-pressed={index === activeIndex}
+              onClick={() => selectPhoto(index)}
+            >
+              <img src={photo.url} alt="" draggable="false" />
             </button>
           ))}
-        </div>
+          {photos.length < MAX_PHOTOS && (
+            <button
+              className="thumbnail add-photo"
+              type="button"
+              aria-label="继续添加照片"
+              onClick={() => inputRef.current?.click()}
+            >
+              +
+            </button>
+          )}
+        </section>
 
-        <div className="adjustments">
-          <div className="adjustment-tabs" role="tablist" aria-label="微调项目">
-            {(Object.keys(adjustmentControls) as AdjustmentId[]).map((id) => (
+        <input
+          ref={inputRef}
+          className="visually-hidden"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFiles}
+        />
+
+        <section className="filter-row" aria-label="滤镜">
+          {FILTERS.map((filter) => (
+            <button
+              className={"filter-button" + (currentEdit.filter === filter.id ? " is-active" : "")}
+              type="button"
+              key={filter.id}
+              aria-label={filter.label + " " + filter.name}
+              aria-pressed={currentEdit.filter === filter.id}
+              disabled={!currentPhoto}
+              onClick={() => updateCurrentEdit({ filter: filter.id })}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </section>
+
+        <section className="adjustment-panel">
+          <nav className="adjustment-tabs" aria-label="微调项目">
+            {(
+              [
+                ["strength", "浓度"],
+                ["brightness", "亮度"],
+                ["color", "色彩"],
+                ["grain", "颗粒"],
+              ] as const
+            ).map(([id, label]) => (
               <button
-                key={id}
+                className={"adjustment-tab" + (activeAdjustment === id ? " is-active" : "")}
                 type="button"
-                role="tab"
-                aria-selected={activeAdjustment === id}
-                className={activeAdjustment === id ? "active" : ""}
-                onClick={() => setActiveAdjustment(id)}
+                key={id}
+                aria-pressed={activeAdjustment === id}
+                disabled={!currentPhoto || (id === "strength" && !currentEdit.filter)}
+                onClick={() => {
+                  setShowOriginal(false);
+                  setActiveAdjustment(id);
+                }}
               >
-                {adjustmentControls[id].label}
+                {label}
               </button>
             ))}
-          </div>
+          </nav>
 
-          <div className="adjustment-control">
-            <span className="control-label">
-              <span>{currentAdjustment.label}</span>
-              <strong>{displayAdjustmentValue}</strong>
-            </span>
+          <div className="slider-block">
+            <div className="slider-meta">
+              <label htmlFor="active-adjustment">{adjustmentConfig.label}</label>
+              <output>{adjustmentConfig.display}</output>
+            </div>
             <input
-              aria-label={currentAdjustment.label}
+              id="active-adjustment"
+              className="range-control"
               type="range"
-              min={currentAdjustment.min}
-              max={currentAdjustment.max}
-              value={currentAdjustment.value}
-              onChange={(event) => currentAdjustment.setValue(Number(event.target.value))}
-              style={rangeStyle(currentAdjustment.progress)}
+              min={adjustmentConfig.min}
+              max={adjustmentConfig.max}
+              value={adjustmentConfig.value}
+              disabled={adjustmentConfig.disabled}
+              style={rangeStyle(
+                adjustmentConfig.value,
+                adjustmentConfig.min,
+                adjustmentConfig.max,
+              )}
+              onChange={(event) =>
+                updateCurrentEdit({
+                  [activeAdjustment]: Number(event.target.value),
+                } as Partial<EditState>)
+              }
             />
           </div>
+        </section>
+
+        <div className="secondary-actions">
+          <button type="button" disabled={photos.length < 2} onClick={applyToAll}>
+            应用到全部
+          </button>
+          <button type="button" disabled={!currentPhoto} onClick={resetCurrent}>
+            重置当前
+          </button>
         </div>
 
-        <button className="primary-button" type="button" onClick={exportPhotos} disabled={busy}>
-          <span>{busy ? "正在处理…" : photos.length > 1 ? `保存 ${photos.length} 张照片` : "保存照片"}</span>
-          <span aria-hidden="true">→</span>
+        <button
+          className="save-button"
+          type="button"
+          disabled={!photos.length || busy}
+          onClick={() => void exportPhotos()}
+        >
+          <span>{busy ? status : photos.length > 1 ? "保存全部照片" : "保存照片"}</span>
+          <span className="save-arrow" aria-hidden="true">→</span>
         </button>
-        <p className="status-line" role="status">{status}</p>
+
+        <p className="privacy-note">
+          <span aria-hidden="true" />
+          照片仅在本机处理
+        </p>
+        <p className="visually-hidden" role="status" aria-live="polite">
+          {status}
+        </p>
+        {toast && <div className="toast" role="status">{toast}</div>}
       </section>
     </main>
   );
