@@ -167,7 +167,7 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /\.adjustment-tab\s*\{[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)/s);
     assert.match(styles, /\.bottom-action\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*transparent[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)/s);
     assert.match(styles, /\.save-action\s*\{[^}]*background:\s*transparent[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)/s);
-    assert.match(styles, /\.compare-button\s*\{[^}]*border:\s*1px solid var\(--control-surface\)[^}]*border-radius:\s*999px/s);
+    assert.match(styles, /\.compare-button\s*\{[^}]*border:\s*0[^}]*border-radius:\s*999px/s);
     assert.match(styles, /\.compare-button\.is-active\s*\{[^}]*color:\s*var\(--privacy-dot\)/s);
     assert.match(styles, /\.privacy-note\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.compare-button\s*\{[^}]*color:\s*var\(--control-surface\)/s);
@@ -191,10 +191,10 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=21"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=21"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=21"/);
-  assert.match(staticWorker, /see-static-v21/);
-  assert.match(staticWorker, /image-engine\.js\?v=21/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=22"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=22"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=22"/);
+  assert.match(staticWorker, /see-static-v22/);
+  assert.match(staticWorker, /image-engine\.js\?v=22/);
   assert.match(appWorker, /see-v12/);
 });
