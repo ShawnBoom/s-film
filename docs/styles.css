@@ -393,7 +393,7 @@ input:focus-visible {
   height: 27px;
   padding: 0 5px 0 3px;
   border-bottom: 0.5px solid transparent;
-  color: var(--muted);
+  color: var(--control-surface);
   font-family: var(--font-schoolbook);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
@@ -401,7 +401,7 @@ input:focus-visible {
 
 .value-input:focus-within {
   border-bottom-color: var(--accent);
-  color: var(--ink);
+  color: var(--control-surface);
 }
 
 .value-input input {
