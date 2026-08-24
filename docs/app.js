@@ -1,4 +1,4 @@
-import { hashSeed, processPixels } from "./image-engine.js?v=19";
+import { hashSeed, processPixels } from "./image-engine.js?v=20";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -128,7 +128,6 @@ function renderThumbnails() {
     add.type = "button";
     add.className = "thumbnail add-photo";
     add.setAttribute("aria-label", "继续添加照片");
-    add.textContent = "+";
     add.addEventListener("click", () => elements.input.click());
     elements.thumbnailRail.append(add);
   }
@@ -520,7 +519,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=19", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=20", { scope: "./" }).catch(() => {});
   });
 }
 

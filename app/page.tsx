@@ -487,31 +487,28 @@ export default function Home() {
               </span>
             </>
           )}
-        </section>
-
-        <section className="thumbnail-rail" aria-label="照片列表">
-          {photos.map((photo, index) => (
-            <button
-              className={"thumbnail" + (index === activeIndex ? " is-active" : "")}
-              type="button"
-              key={photo.id}
-              aria-label={"选择第 " + (index + 1) + " 张照片"}
-              aria-pressed={index === activeIndex}
-              onClick={() => selectPhoto(index)}
-            >
-              <img src={photo.url} alt="" draggable="false" />
-            </button>
-          ))}
-          {photos.length < MAX_PHOTOS && (
-            <button
-              className="thumbnail add-photo"
-              type="button"
-              aria-label="继续添加照片"
-              onClick={() => inputRef.current?.click()}
-            >
-              +
-            </button>
-          )}
+          <section className="thumbnail-rail" aria-label="照片列表">
+            {photos.map((photo, index) => (
+              <button
+                className={"thumbnail" + (index === activeIndex ? " is-active" : "")}
+                type="button"
+                key={photo.id}
+                aria-label={"选择第 " + (index + 1) + " 张照片"}
+                aria-pressed={index === activeIndex}
+                onClick={() => selectPhoto(index)}
+              >
+                <img src={photo.url} alt="" draggable="false" />
+              </button>
+            ))}
+            {photos.length < MAX_PHOTOS && (
+              <button
+                className="thumbnail add-photo"
+                type="button"
+                aria-label="继续添加照片"
+                onClick={() => inputRef.current?.click()}
+              />
+            )}
+          </section>
         </section>
 
         <input

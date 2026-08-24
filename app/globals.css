@@ -93,8 +93,8 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex: 0 0 40px;
-  min-height: 40px;
+  flex: 0 0 38px;
+  min-height: 38px;
   padding: 0 13px 0 15px;
 }
 
@@ -166,13 +166,15 @@ input:focus-visible {
 
 .compare-button {
   left: 10px;
-  bottom: 10px;
+  bottom: 48px;
   display: grid;
-  min-width: 60px;
+  min-width: 62px;
   min-height: 28px;
   padding: 0 10px;
   place-items: center;
+  border: 1px solid var(--control-surface);
   border-radius: 999px;
+  background: rgba(23, 24, 22, 0.7);
   color: var(--control-surface);
   cursor: pointer;
   font-family: var(--font-schoolbook);
@@ -181,8 +183,8 @@ input:focus-visible {
 }
 
 .compare-button.is-active {
-  background: rgba(243, 232, 204, 0.92);
-  color: #171816;
+  background: rgba(23, 24, 22, 0.7);
+  color: var(--privacy-dot);
 }
 
 .delete-button {
@@ -216,7 +218,7 @@ input:focus-visible {
 
 .photo-count {
   right: 10px;
-  bottom: 10px;
+  bottom: 48px;
   display: grid;
   min-width: 38px;
   min-height: 28px;
@@ -231,13 +233,17 @@ input:focus-visible {
 }
 
 .thumbnail-rail {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
-  flex: 0 0 46px;
   gap: 6px;
-  min-height: 46px;
-  padding: 6px 11px;
+  height: 40px;
+  padding: 5px 10px;
   overflow-x: auto;
-  border-bottom: 0.5px solid var(--line);
+  background: linear-gradient(to bottom, transparent, rgba(23, 24, 22, 0.68));
   scrollbar-width: none;
 }
 
@@ -245,9 +251,9 @@ input:focus-visible {
 
 .thumbnail {
   position: relative;
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
   overflow: hidden;
   padding: 0;
   border: 0.5px solid var(--line);
@@ -273,15 +279,29 @@ input:focus-visible {
   place-items: center;
   background: transparent;
   color: var(--control-surface);
-  font-size: 19px;
-  font-weight: 300;
 }
+
+.thumbnail.add-photo::before,
+.thumbnail.add-photo::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 1.25px;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+}
+
+.thumbnail.add-photo::before { transform: translate(-50%, -50%); }
+.thumbnail.add-photo::after { transform: translate(-50%, -50%) rotate(90deg); }
 
 .filter-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  flex: 0 0 40px;
-  min-height: 40px;
+  flex: 0 0 34px;
+  min-height: 34px;
+  border-top: 0.5px solid var(--line);
   border-bottom: 0.5px solid var(--line);
 }
 
@@ -293,7 +313,7 @@ input:focus-visible {
   border: 0;
   border-right: 0.5px solid var(--line);
   background: transparent;
-  color: var(--muted);
+  color: rgba(243, 232, 204, 0.5);
   cursor: pointer;
   font-family: var(--font-schoolbook);
   font-size: 11px;
@@ -305,8 +325,7 @@ input:focus-visible {
 .filter-button:last-child { border-right: 0; }
 
 .filter-button.is-active {
-  color: var(--privacy-dot);
-  box-shadow: inset 0 -2px 0 var(--accent);
+  color: var(--control-surface);
 }
 
 .filter-button:disabled,
@@ -319,9 +338,9 @@ input:focus-visible {
 }
 
 .adjustment-panel {
-  flex: 0 0 70px;
-  min-height: 70px;
-  padding: 6px 12px 7px;
+  flex: 0 0 64px;
+  min-height: 64px;
+  padding: 5px 12px 6px;
 }
 
 .adjustment-tabs {
@@ -331,12 +350,12 @@ input:focus-visible {
 }
 
 .adjustment-tab {
-  min-height: 27px;
+  min-height: 26px;
   padding: 0 4px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--muted);
+  color: rgba(243, 232, 204, 0.5);
   cursor: pointer;
   font-size: 10px;
 }
@@ -353,8 +372,8 @@ input:focus-visible {
   grid-template-columns: minmax(0, 1fr) 54px;
   align-items: center;
   gap: 9px;
-  min-height: 29px;
-  padding-top: 5px;
+  min-height: 27px;
+  padding-top: 4px;
 }
 
 .range-control {
@@ -427,37 +446,33 @@ input:focus-visible {
 
 .bottom-actions {
   display: grid;
-  grid-template-columns: 0.76fr 1fr 1.12fr;
-  flex: 0 0 46px;
-  min-height: 46px;
-  margin: 0 12px 9px;
-  border: 0.5px solid var(--line);
+  grid-template-columns: repeat(3, 1fr);
+  flex: 0 0 40px;
+  gap: 5px;
+  min-height: 40px;
+  margin: 0 12px 7px;
 }
 
 .bottom-action {
   min-width: 0;
   padding: 0 8px;
-  border: 0;
-  border-right: 0.5px solid var(--line);
+  border: 1px solid transparent;
+  border-radius: 999px;
   background: transparent;
+  color: rgba(243, 232, 204, 0.5);
   cursor: pointer;
   font-size: 11px;
 }
 
-.bottom-action:last-child { border-right: 0; }
-.reset-action { color: var(--muted); }
-.apply-action { color: var(--ink); }
-
 .save-action {
-  background: var(--control-surface);
-  color: var(--control-ink);
-  font-size: 12px;
-  font-weight: 500;
+  background: transparent;
+  color: rgba(243, 232, 204, 0.5);
 }
 
 .bottom-action:active:not(:disabled) {
+  border-color: var(--privacy-dot);
   background: var(--privacy-dot);
-  color: #f3e8cc;
+  color: var(--accent);
 }
 
 .toast {
@@ -499,13 +514,15 @@ input:focus-visible {
 
 @media (max-height: 700px) {
   .topbar { flex-basis: 36px; min-height: 36px; }
-  .thumbnail-rail { flex-basis: 42px; min-height: 42px; padding-block: 5px; }
-  .thumbnail { width: 32px; height: 32px; flex-basis: 32px; }
-  .filter-row { flex-basis: 36px; min-height: 36px; }
-  .adjustment-panel { flex-basis: 63px; min-height: 63px; padding-block: 4px 5px; }
-  .adjustment-tab { min-height: 25px; }
+  .thumbnail-rail { height: 36px; padding-block: 4px; }
+  .thumbnail { width: 28px; height: 28px; flex-basis: 28px; }
+  .compare-button,
+  .photo-count { bottom: 44px; }
+  .filter-row { flex-basis: 32px; min-height: 32px; }
+  .adjustment-panel { flex-basis: 60px; min-height: 60px; padding-block: 4px 5px; }
+  .adjustment-tab { min-height: 24px; }
   .slider-row { padding-top: 3px; }
-  .bottom-actions { flex-basis: 42px; min-height: 42px; margin-bottom: 6px; }
+  .bottom-actions { flex-basis: 38px; min-height: 38px; margin-bottom: 5px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -156,18 +156,24 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /--font-schoolbook:[^;]*Century Schoolbook/i);
     assert.match(styles, /HarmonyOS Sans SC/i);
     assert.doesNotMatch(styles, /--font-clarendon/);
-    assert.match(styles, /\.filter-button\s*\{[^}]*font-family:\s*var\(--font-schoolbook\)[^}]*font-style:\s*italic/s);
+    assert.match(styles, /\.filter-button\s*\{[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)[^}]*font-family:\s*var\(--font-schoolbook\)[^}]*font-style:\s*italic/s);
     assert.match(styles, /background:\s*var\(--privacy-dot\)/);
-    assert.match(styles, /\.filter-button\.is-active\s*\{[^}]*color:\s*var\(--privacy-dot\)/s);
+    assert.match(styles, /\.filter-button\.is-active\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.adjustment-tab\.is-active\s*\{[^}]*background:\s*var\(--accent\)[^}]*color:\s*var\(--privacy-dot\)/s);
-    assert.match(styles, /\.save-action\s*\{[^}]*background:\s*var\(--control-surface\)/s);
-    assert.match(styles, /\.compare-button\s*\{[^}]*border-radius:\s*999px/s);
+    assert.match(styles, /\.adjustment-tab\s*\{[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)/s);
+    assert.match(styles, /\.bottom-action\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*transparent[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)/s);
+    assert.match(styles, /\.save-action\s*\{[^}]*background:\s*transparent[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)/s);
+    assert.match(styles, /\.compare-button\s*\{[^}]*border:\s*1px solid var\(--control-surface\)[^}]*border-radius:\s*999px/s);
+    assert.match(styles, /\.compare-button\.is-active\s*\{[^}]*color:\s*var\(--privacy-dot\)/s);
     assert.match(styles, /\.privacy-note\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.compare-button\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.thumbnail\.add-photo\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.value-input\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.photo-count\s*\{[^}]*background:\s*transparent[^}]*color:\s*var\(--privacy-dot\)/s);
-    assert.match(styles, /\.bottom-action:active:not\(:disabled\)\s*\{[^}]*background:\s*var\(--privacy-dot\)/s);
+    assert.match(styles, /\.bottom-action:active:not\(:disabled\)\s*\{[^}]*border-color:\s*var\(--privacy-dot\)[^}]*background:\s*var\(--privacy-dot\)[^}]*color:\s*var\(--accent\)/s);
+    assert.match(styles, /\.thumbnail-rail\s*\{[^}]*position:\s*absolute[^}]*height:\s*40px/s);
+    assert.match(styles, /\.photo-stage\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0/s);
+    assert.match(styles, /\.thumbnail\.add-photo::before,[^}]*\.thumbnail\.add-photo::after\s*\{[^}]*width:\s*10px[^}]*height:\s*1\.25px/s);
     assert.match(styles, /overflow:\s*hidden/);
     assert.match(styles, /100dvh/);
   }
@@ -181,10 +187,10 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=19"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=19"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=19"/);
-  assert.match(staticWorker, /see-static-v19/);
-  assert.match(staticWorker, /image-engine\.js\?v=19/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=20"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=20"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=20"/);
+  assert.match(staticWorker, /see-static-v20/);
+  assert.match(staticWorker, /image-engine\.js\?v=20/);
   assert.match(appWorker, /see-v11/);
 });
