@@ -452,6 +452,11 @@ input:focus-visible {
   font-weight: 500;
 }
 
+.bottom-action:active:not(:disabled) {
+  background: var(--privacy-dot);
+  color: #f3e8cc;
+}
+
 .toast {
   position: absolute;
   z-index: 4;
