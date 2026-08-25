@@ -800,7 +800,8 @@ export default function Home() {
     "Grain: " + currentEdit.grain,
     "Light v2: " + (currentEdit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (currentEdit.color === 0 ? "off" : "active"),
-    "Grain v2.1: " + (currentEdit.grain === 0 ? "off" : "active"),
+    "Grain engine: v3 particle " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
+    "Reference grain scale: 960 px long edge",
     "grainSeed: " + (currentPhoto ? currentPhoto.grainSeed : "—"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback

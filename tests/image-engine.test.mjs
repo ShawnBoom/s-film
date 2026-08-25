@@ -188,33 +188,38 @@ test("Color v2.1 reaches perceptual grayscale at -100", () => {
   }
 });
 
-test("Grain v2.2 keeps layer frequencies anchored while strengthening amplitude and mid/coarse participation", () => {
+test("Grain v3 maps the slider to stable particle density, contrast, and population activation", () => {
   const values = [15, 25, 50, 75, 100].map((grain) =>
     getGrainParameters(grain, 4032, 3024));
   for (let index = 1; index < values.length; index += 1) {
-    assert.ok(values[index].amplitude > values[index - 1].amplitude);
-    assert.ok(values[index].coarseWeight > values[index - 1].coarseWeight);
-    assert.ok(values[index].clusterStrength > values[index - 1].clusterStrength);
-    assert.equal(values[index].fineScale, values[0].fineScale);
-    assert.equal(values[index].mediumScale, values[0].mediumScale);
-    assert.equal(values[index].coarseScale, values[0].coarseScale);
-    assert.equal(values[index].clusterScale, values[0].clusterScale);
+    assert.ok(values[index].contrast > values[index - 1].contrast);
+    assert.ok(values[index].fineActivation > values[index - 1].fineActivation);
+    assert.ok(values[index].mediumActivation > values[index - 1].mediumActivation);
+    assert.ok(values[index].coarseActivation >= values[index - 1].coarseActivation);
+    assert.equal(values[index].cellSize, values[0].cellSize);
+    assert.equal(values[index].coordinateScale, values[0].coordinateScale);
   }
-  assert.ok(values[4].fineWeight > values[4].mediumWeight);
-  assert.ok(values[4].mediumWeight > values[4].coarseWeight);
-  assert.ok(Math.abs(values[0].amplitude - 0.18 * 0.15 ** 1.08) < 1e-12);
-  assert.ok(Math.abs(values[1].amplitude - 0.18 * 0.25 ** 1.08) < 1e-12);
-  assert.ok(Math.abs(values[2].amplitude - 0.18 * 0.5 ** 1.08) < 1e-12);
-  assert.ok(Math.abs(values[3].amplitude - 0.18 * 0.75 ** 1.08) < 1e-12);
-  assert.equal(values[4].amplitude, 0.18);
-  assert.equal(values[4].fineWeight, 0.64);
-  assert.equal(values[4].mediumWeight, 0.27);
-  assert.ok(Math.abs(values[4].coarseWeight - 0.09) < 1e-12);
-  assert.ok(values[4].clusterStrength <= 0.025);
-  assert.equal(getGrainParameters(0, 4032, 3024).active, false);
+  assert.equal(values[0].engine, "v3-particle");
+  assert.equal(values[0].referenceLongEdge, 960);
+  assert.equal(values[0].finePopulation, 0.7);
+  assert.equal(values[0].mediumPopulation, 0.23);
+  assert.equal(values[0].coarsePopulation, 0.07);
+  assert.equal(values[0].fineRadiusMin * 2, 1);
+  assert.equal(values[0].fineRadiusMax * 2, 1.6);
+  assert.equal(values[0].mediumRadiusMin * 2, 1.8);
+  assert.equal(values[0].mediumRadiusMax * 2, 2.8);
+  assert.equal(values[0].coarseRadiusMin * 2, 3);
+  assert.equal(values[0].coarseRadiusMax * 2, 4.5);
+  assert.ok(values[0].mediumActivation < values[0].fineActivation * 0.02);
+  assert.ok(values[2].mediumActivation > values[2].fineActivation * 0.6);
+  assert.ok(values[2].coarseActivation < values[2].fineActivation * 0.1);
+  assert.ok(values[4].coarseActivation > values[4].fineActivation * 0.99);
+  const disabled = getGrainParameters(0, 4032, 3024);
+  assert.equal(disabled.active, false);
+  assert.equal(disabled.contrast, 0);
 });
 
-test("Grain v2.2 is luminance-only and approximately zero-mean", () => {
+test("Grain v3 is luminance-only and approximately zero-mean", () => {
   const width = 128;
   const height = 128;
   const gray = new Uint8ClampedArray(width * height * 4);
@@ -238,28 +243,19 @@ test("Grain v2.2 is luminance-only and approximately zero-mean", () => {
   assert.ok(Math.abs(total / (width * height) - 128) < 1);
 });
 
-test("Grain v2.2 uses resolution-independent isotropic coordinates", () => {
-  function uniformGray(width, height) {
-    const data = new Uint8ClampedArray(width * height * 4);
-    for (let offset = 0; offset < data.length; offset += 4) {
-      data[offset] = 128;
-      data[offset + 1] = 128;
-      data[offset + 2] = 128;
-      data[offset + 3] = 255;
-    }
-    return { width, height, data };
-  }
-  const edit = { filter: null, strength: 100, brightness: 0, color: 0, grain: 75 };
-  const small = processPixels(uniformGray(40, 24), edit, 777);
-  const large = processPixels(uniformGray(80, 48), edit, 777);
-
-  for (let y = 0; y < 24; y += 3) {
-    for (let x = 0; x < 40; x += 3) {
-      const smallOffset = (y * 40 + x) * 4;
-      const largeOffset = ((y * 2) * 80 + x * 2) * 4;
-      assert.equal(small[smallOffset], large[largeOffset]);
-    }
-  }
+test("Grain v3 keeps particle geometry isotropic and resolution-independent", () => {
+  const preview = getGrainParameters(50, 540, 960);
+  const exportSize = getGrainParameters(50, 2268, 4032);
+  assert.equal(preview.coordinateScale, 1);
+  assert.equal(exportSize.coordinateScale, 960 / 4032);
+  assert.equal(preview.fineRadiusMin, exportSize.fineRadiusMin);
+  assert.equal(preview.coarseRadiusMax, exportSize.coarseRadiusMax);
+  const exportFineDiameterPixels = (exportSize.fineRadiusMin * 2) / exportSize.coordinateScale;
+  const resizedFineDiameter = exportFineDiameterPixels * (960 / 4032);
+  const exportCoarseDiameterPixels = (exportSize.coarseRadiusMax * 2) / exportSize.coordinateScale;
+  const resizedCoarseDiameter = exportCoarseDiameterPixels * (960 / 4032);
+  assert.ok(Math.abs(resizedFineDiameter - preview.fineRadiusMin * 2) < 1e-12);
+  assert.ok(Math.abs(resizedCoarseDiameter - preview.coarseRadiusMax * 2) < 1e-12);
 });
 
 test("preset strength zero restores the exact original", () => {
@@ -603,7 +599,7 @@ test("brightness and perceptual color controls respond across their full ranges"
   }
 });
 
-test("Grain v2.2 is neutral at zero and stable for a photo instance seed", () => {
+test("Grain v3 is neutral at zero and stable for a photo instance seed", () => {
   const edit = { filter: null, strength: 100, brightness: 0, color: 0, grain: 65 };
   const first = processPixels(source, edit, 123);
   const second = processPixels(source, edit, 123);
