@@ -4,6 +4,7 @@ import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
 import {
   createNeutralEdit,
   getColorParameters,
+  getGrainParameters,
   getLightParameters,
   processPixels,
 } from "../lib/image-engine.js";
@@ -152,6 +153,66 @@ test("Color v2 reaches perceptual grayscale at -100", () => {
   for (let offset = 0; offset < result.length; offset += 4) {
     const channels = [result[offset], result[offset + 1], result[offset + 2]];
     assert.ok(Math.max(...channels) - Math.min(...channels) <= 1);
+  }
+});
+
+test("Grain v2 evolves from fine texture to coarser clustered texture", () => {
+  const values = [15, 25, 50, 75, 100].map((grain) =>
+    getGrainParameters(grain, 4032, 3024));
+  for (let index = 1; index < values.length; index += 1) {
+    assert.ok(values[index].baseScale > values[index - 1].baseScale);
+    assert.ok(values[index].amplitude > values[index - 1].amplitude);
+    assert.ok(values[index].coarseWeight > values[index - 1].coarseWeight);
+    assert.ok(values[index].clusterStrength > values[index - 1].clusterStrength);
+  }
+  assert.equal(getGrainParameters(0, 4032, 3024).active, false);
+});
+
+test("Grain v2 is luminance-only and approximately zero-mean", () => {
+  const width = 128;
+  const height = 128;
+  const gray = new Uint8ClampedArray(width * height * 4);
+  for (let offset = 0; offset < gray.length; offset += 4) {
+    gray[offset] = 128;
+    gray[offset + 1] = 128;
+    gray[offset + 2] = 128;
+    gray[offset + 3] = 255;
+  }
+  const result = processPixels(
+    { width, height, data: gray },
+    { filter: null, strength: 100, brightness: 0, color: 0, grain: 100 },
+    2468,
+  );
+  let total = 0;
+  for (let offset = 0; offset < result.length; offset += 4) {
+    assert.equal(result[offset], result[offset + 1]);
+    assert.equal(result[offset], result[offset + 2]);
+    total += result[offset];
+  }
+  assert.ok(Math.abs(total / (width * height) - 128) < 1);
+});
+
+test("Grain v2 uses resolution-independent isotropic coordinates", () => {
+  function uniformGray(width, height) {
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let offset = 0; offset < data.length; offset += 4) {
+      data[offset] = 128;
+      data[offset + 1] = 128;
+      data[offset + 2] = 128;
+      data[offset + 3] = 255;
+    }
+    return { width, height, data };
+  }
+  const edit = { filter: null, strength: 100, brightness: 0, color: 0, grain: 75 };
+  const small = processPixels(uniformGray(40, 24), edit, 777);
+  const large = processPixels(uniformGray(80, 48), edit, 777);
+
+  for (let y = 0; y < 24; y += 3) {
+    for (let x = 0; x < 40; x += 3) {
+      const smallOffset = (y * 40 + x) * 4;
+      const largeOffset = ((y * 2) * 80 + x * 2) * 4;
+      assert.equal(small[smallOffset], large[largeOffset]);
+    }
   }
 });
 

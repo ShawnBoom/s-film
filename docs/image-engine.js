@@ -304,30 +304,53 @@ function valueNoise(x, y, scale, seed) {
   return top + (bottom - top) * ty;
 }
 
-function applyGrain(r, g, b, x, y, width, height, grain, seed) {
-  if (grain === 0) return [r, g, b];
-
+export function getGrainParameters(grain, width, height) {
   const amount = Math.max(0, Math.min(1, grain / 100));
-  const longEdge = Math.max(width, height);
-  const baseScale = Math.max(1, (longEdge / 1100) * (0.85 + amount * 0.5));
-  const fine = valueNoise(x, y, baseScale, seed);
-  const medium = valueNoise(x, y, baseScale * 2.45, seed ^ 0x45d9f3b);
-  const coarse = valueNoise(x, y, baseScale * 6.2, seed ^ 0x27d4eb2d);
-  const cluster = valueNoise(x, y, baseScale * 13, seed ^ 0x165667b1);
-  const texture = (fine * 0.56 + medium * 0.3 + coarse * 0.14) * (0.84 + cluster * 0.16);
-  const luminance = clamp01(r * 0.2126 + g * 0.7152 + b * 0.0722);
-  const visibility = 0.16 + 0.84 * Math.sin(Math.PI * luminance) ** 0.62;
-  const amplitude = 0.062 * amount ** 1.12 * visibility;
-  const luminanceGrain = texture * amplitude;
-  const chromaAmount = amplitude * 0.13;
-  const chromaA = (fine * 0.65 + medium * 0.35) * chromaAmount;
-  const chromaB = (medium * 0.55 + coarse * 0.45) * chromaAmount;
+  if (amount === 0) {
+    return {
+      active: false,
+      coordinateScale: 0,
+      baseScale: 1,
+      amplitude: 0,
+      fineWeight: 0,
+      mediumWeight: 0,
+      coarseWeight: 0,
+      clusterStrength: 0,
+    };
+  }
 
-  return [
-    r + luminanceGrain + chromaA,
-    g + luminanceGrain - chromaA * 0.45 + chromaB * 0.2,
-    b + luminanceGrain - chromaB * 0.7,
-  ];
+  const character = amount ** 1.2;
+  const fineWeight = 0.68 - 0.22 * amount;
+  const coarseWeight = 0.07 + 0.12 * amount;
+  return {
+    active: true,
+    coordinateScale: 1100 / Math.max(1, width, height),
+    baseScale: 0.75 + 2.25 * character,
+    amplitude: 0.06 * amount ** 1.15,
+    fineWeight,
+    mediumWeight: 1 - fineWeight - coarseWeight,
+    coarseWeight,
+    clusterStrength: 0.05 + 0.15 * amount,
+  };
+}
+
+function sampleGrain(r, g, b, x, y, parameters, seed) {
+  const pointX = x * parameters.coordinateScale;
+  const pointY = y * parameters.coordinateScale;
+  const fine = valueNoise(pointX, pointY, parameters.baseScale, seed);
+  const medium = valueNoise(pointX, pointY, parameters.baseScale * 2.4, seed ^ 0x45d9f3b);
+  const coarse = valueNoise(pointX, pointY, parameters.baseScale * 5.8, seed ^ 0x27d4eb2d);
+  const cluster = valueNoise(pointX, pointY, parameters.baseScale * 12.5, seed ^ 0x165667b1);
+  const texture = (
+    fine * parameters.fineWeight
+    + medium * parameters.mediumWeight
+    + coarse * parameters.coarseWeight
+  ) * (1 + cluster * parameters.clusterStrength);
+  const luminance = clamp01(r * 0.2126 + g * 0.7152 + b * 0.0722);
+  const edgeVisibility = 0.35 + (0.3 - 0.35) * luminance;
+  const midtone = 4 * luminance * (1 - luminance);
+  const visibility = edgeVisibility + (1 - edgeVisibility) * midtone * midtone;
+  return texture * parameters.amplitude * visibility;
 }
 
 export function hashSeed(value) {
@@ -358,6 +381,7 @@ export function processPixels(source, edit, seed = 1) {
   const colorParameters = getColorParameters(color);
   const width = source.width;
   const height = source.height;
+  const grainParameters = getGrainParameters(grain, width, height);
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -381,7 +405,12 @@ export function processPixels(source, edit, seed = 1) {
 
       if (lightParameters.active) [r, g, b] = applyExposure(r, g, b, lightParameters);
       if (colorParameters.active) [r, g, b] = applyColor(r, g, b, colorParameters);
-      [r, g, b] = applyGrain(r, g, b, x, y, width, height, grain, seed);
+      if (grainParameters.active) {
+        const grainValue = sampleGrain(r, g, b, x, y, grainParameters, seed);
+        r += grainValue;
+        g += grainValue;
+        b += grainValue;
+      }
 
       output[offset] = Math.round(linearToSrgb(r) * 255);
       output[offset + 1] = Math.round(linearToSrgb(g) * 255);
