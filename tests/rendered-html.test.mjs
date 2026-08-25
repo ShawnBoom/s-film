@@ -301,20 +301,20 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=52"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=52"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=52"/);
-  assert.match(staticApp, /from "\.\/lut-loader\.js\?v=52"/);
-  assert.match(staticWorker, /see-core-v52/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=53"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=53"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=53"/);
+  assert.match(staticApp, /from "\.\/lut-loader\.js\?v=53"/);
+  assert.match(staticWorker, /see-core-v53/);
   assert.match(staticWorker, /see-luts-v52/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=52/);
-  assert.match(staticWorker, /gpu-export\.js\?v=52/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=53/);
+  assert.match(staticWorker, /gpu-export\.js\?v=53/);
   assert.doesNotMatch(staticWorker, /gpu-export-benchmark/);
-  assert.match(staticWorker, /export-processor\.js\?v=52/);
-  assert.match(staticWorker, /export-worker\.js\?v=52/);
-  assert.match(staticWorker, /image-engine\.js\?v=52/);
-  assert.match(staticWorker, /edit-state\.js\?v=52/);
-  assert.match(staticWorker, /lut-loader\.js\?v=52/);
+  assert.match(staticWorker, /export-processor\.js\?v=53/);
+  assert.match(staticWorker, /export-worker\.js\?v=53/);
+  assert.match(staticWorker, /image-engine\.js\?v=53/);
+  assert.match(staticWorker, /edit-state\.js\?v=53/);
+  assert.match(staticWorker, /lut-loader\.js\?v=53/);
   const coreShell = staticWorker.match(/const CORE_APP_SHELL = \[([\s\S]*?)\n\];/)?.[1] ?? "";
   assert.doesNotMatch(coreShell, /s(?:0[1-9]|1[0-4])-[^"']+-lut\.js/);
   assert.doesNotMatch(staticEngine, /from "\.\/s(?:0[1-9]|1[0-4])-[^"]+-lut\.js"/);
@@ -323,8 +323,8 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
   assert.match(staticWorker, /await cache\.match\(ROOT\)[\s\S]*\|\| networkUpdate/);
   assert.match(staticWorker, /isLutRequest/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-core-v52/);
-  assert.match(appWorker, /see-runtime-v52/);
+  assert.match(appWorker, /see-core-v53/);
+  assert.match(appWorker, /see-runtime-v53/);
   assert.match(appWorker, /see-welcome\.png/);
 });
 
@@ -395,8 +395,8 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(staticApp, /await attemptGpuFullResolutionExport/);
   assert.match(staticApp, /await ensureExportProcessor\(\)\.process\(source, photo\.edit, photo\.grainSeed\)/);
   assert.match(staticApp, /processPixels\(source, photo\.edit, photo\.grainSeed\)/);
-  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=52"/);
-  assert.match(exportWorker, /import \{ loadFilterLut \} from "\.\/lut-loader\.js\?v=52"/);
+  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=53"/);
+  assert.match(exportWorker, /import \{ loadFilterLut \} from "\.\/lut-loader\.js\?v=53"/);
   assert.match(exportWorker, /await loadFilterLut\(message\.edit\?\.filter\)/);
   assert.match(exportWorker, /const pixels = processPixels\(source, message\.edit, message\.seed\)/);
 

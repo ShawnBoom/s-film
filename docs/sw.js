@@ -1,23 +1,23 @@
 "use strict";
 
-const CORE_CACHE = "see-core-v52";
+const CORE_CACHE = "see-core-v53";
 const LUT_CACHE = "see-luts-v52";
 const LEGACY_LUT_CACHE = "see-static-v48";
 const ROOT = new URL("./", self.registration.scope).href;
 const CORE_APP_SHELL = [
   ROOT,
   new URL("./index.html", ROOT).href,
-  new URL("./styles.css?v=52", ROOT).href,
-  new URL("./app.js?v=52", ROOT).href,
-  new URL("./gpu-preview.js?v=52", ROOT).href,
-  new URL("./gpu-export.js?v=52", ROOT).href,
-  new URL("./export-processor.js?v=52", ROOT).href,
-  new URL("./export-worker.js?v=52", ROOT).href,
-  new URL("./edit-state.js?v=52", ROOT).href,
-  new URL("./image-engine.js?v=52", ROOT).href,
-  new URL("./lut-loader.js?v=52", ROOT).href,
-  new URL("./manifest.webmanifest?v=52", ROOT).href,
-  new URL("./apple-touch-icon.png?v=52", ROOT).href,
+  new URL("./styles.css?v=53", ROOT).href,
+  new URL("./app.js?v=53", ROOT).href,
+  new URL("./gpu-preview.js?v=53", ROOT).href,
+  new URL("./gpu-export.js?v=53", ROOT).href,
+  new URL("./export-processor.js?v=53", ROOT).href,
+  new URL("./export-worker.js?v=53", ROOT).href,
+  new URL("./edit-state.js?v=53", ROOT).href,
+  new URL("./image-engine.js?v=53", ROOT).href,
+  new URL("./lut-loader.js?v=53", ROOT).href,
+  new URL("./manifest.webmanifest?v=53", ROOT).href,
+  new URL("./apple-touch-icon.png?v=53", ROOT).href,
   new URL("./icons/see-apple-touch-icon-120.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-152.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-167.png", ROOT).href,
