@@ -1,17 +1,17 @@
-import { S01_LUT, S01_LUT_SIZE } from "./s01-classic-neg-lut.js?v=38";
-import { S02_LUT, S02_LUT_SIZE } from "./s02-classic-chrome-lut.js?v=38";
-import { S03_LUT, S03_LUT_SIZE } from "./s03-classic-chrome-lut.js?v=38";
-import { S04_LUT, S04_LUT_SIZE } from "./s04-pro400h-lut.js?v=38";
-import { S05_LUT, S05_LUT_SIZE } from "./s05-superia400-lut.js?v=38";
-import { S06_LUT, S06_LUT_SIZE } from "./s06-color100-lut.js?v=38";
-import { S07_LUT, S07_LUT_SIZE } from "./s07-color800z-lut.js?v=38";
-import { S08_LUT, S08_LUT_SIZE } from "./s08-gold-blue-lut.js?v=38";
-import { S09_LUT, S09_LUT_SIZE } from "./s09-portra-cool-lut.js?v=38";
-import { S10_LUT, S10_LUT_SIZE } from "./s10-proimage-original-lut.js?v=38";
-import { S11_LUT, S11_LUT_SIZE } from "./s11-ektar100-lut.js?v=38";
-import { S12_LUT, S12_LUT_SIZE } from "./s12-portra400-lut.js?v=38";
-import { S13_LUT, S13_LUT_SIZE } from "./s13-gold200-lut.js?v=38";
-import { S14_LUT, S14_LUT_SIZE } from "./s14-chrome64-lut.js?v=38";
+import { S01_LUT, S01_LUT_SIZE } from "./s01-classic-neg-lut.js?v=39";
+import { S02_LUT, S02_LUT_SIZE } from "./s02-classic-chrome-lut.js?v=39";
+import { S03_LUT, S03_LUT_SIZE } from "./s03-classic-chrome-lut.js?v=39";
+import { S04_LUT, S04_LUT_SIZE } from "./s04-pro400h-lut.js?v=39";
+import { S05_LUT, S05_LUT_SIZE } from "./s05-superia400-lut.js?v=39";
+import { S06_LUT, S06_LUT_SIZE } from "./s06-color100-lut.js?v=39";
+import { S07_LUT, S07_LUT_SIZE } from "./s07-color800z-lut.js?v=39";
+import { S08_LUT, S08_LUT_SIZE } from "./s08-gold-blue-lut.js?v=39";
+import { S09_LUT, S09_LUT_SIZE } from "./s09-portra-cool-lut.js?v=39";
+import { S10_LUT, S10_LUT_SIZE } from "./s10-proimage-original-lut.js?v=39";
+import { S11_LUT, S11_LUT_SIZE } from "./s11-ektar100-lut.js?v=39";
+import { S12_LUT, S12_LUT_SIZE } from "./s12-portra400-lut.js?v=39";
+import { S13_LUT, S13_LUT_SIZE } from "./s13-gold200-lut.js?v=39";
+import { S14_LUT, S14_LUT_SIZE } from "./s14-chrome64-lut.js?v=39";
 
 const SRGB_TO_LINEAR = Array.from({ length: 256 }, (_, value) => {
   const channel = value / 255;
@@ -84,6 +84,24 @@ function applyLut(lut, size, r, g, b) {
   }
 
   return output;
+}
+
+export function getFilterLut(filter) {
+  if (filter === "classic") return { data: S01_LUT, size: S01_LUT_SIZE };
+  if (filter === "gold") return { data: S02_LUT, size: S02_LUT_SIZE };
+  if (filter === "youth") return { data: S03_LUT, size: S03_LUT_SIZE };
+  if (filter === "slot04") return { data: S04_LUT, size: S04_LUT_SIZE };
+  if (filter === "slot05") return { data: S05_LUT, size: S05_LUT_SIZE };
+  if (filter === "slot06") return { data: S06_LUT, size: S06_LUT_SIZE };
+  if (filter === "slot07") return { data: S07_LUT, size: S07_LUT_SIZE };
+  if (filter === "slot08") return { data: S08_LUT, size: S08_LUT_SIZE };
+  if (filter === "slot09") return { data: S09_LUT, size: S09_LUT_SIZE };
+  if (filter === "slot10") return { data: S10_LUT, size: S10_LUT_SIZE };
+  if (filter === "slot11") return { data: S11_LUT, size: S11_LUT_SIZE };
+  if (filter === "slot12") return { data: S12_LUT, size: S12_LUT_SIZE };
+  if (filter === "slot13") return { data: S13_LUT, size: S13_LUT_SIZE };
+  if (filter === "slot14") return { data: S14_LUT, size: S14_LUT_SIZE };
+  return null;
 }
 
 function applyPresetSrgb(r, g, b, filter) {

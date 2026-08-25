@@ -1,5 +1,6 @@
-import { hashSeed, processPixels } from "./image-engine.js?v=38";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=38";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=39";
+import { hashSeed, processPixels } from "./image-engine.js?v=39";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=39";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -34,6 +35,8 @@ const elements = {
   filters: Array.from(document.querySelectorAll("[data-filter]")),
   adjustmentTabs: Array.from(document.querySelectorAll("[data-adjustment]")),
 };
+
+const gpuPreview = createGpuPreviewRenderer(elements.canvas);
 
 function createNeutralEdit() {
   return { filter: null, strength: 100, brightness: 0, color: 0, grain: 0 };
@@ -111,7 +114,11 @@ function updateAdjustmentValue(value) {
   if (!photo) return;
   const config = sliderConfig(photo.edit);
   const clamped = clampAdjustment(value, config.min, config.max);
-  updateCurrentEdit({ [state.activeAdjustment]: clamped });
+  photo.edit[state.activeAdjustment] = clamped;
+  state.showOriginal = false;
+  renderCompareState(photo);
+  renderAdjustmentControls(photo, photo.edit);
+  queuePreview();
 }
 
 function renderThumbnails() {
@@ -141,25 +148,7 @@ function renderThumbnails() {
   }
 }
 
-function renderControls() {
-  const photo = currentPhoto();
-  const edit = photo ? photo.edit : createNeutralEdit();
-  elements.stage.classList.toggle("has-photo", Boolean(photo));
-  elements.compareButton.hidden = !photo;
-  renderCompareState(photo);
-  elements.deleteButton.hidden = !photo;
-  elements.photoCount.hidden = !photo;
-  elements.photoCount.textContent = photo ? state.activeIndex + 1 + " / " + state.photos.length : "";
-  elements.exportButton.disabled = !photo || state.busy;
-  elements.applyAll.disabled = state.photos.length < 2;
-  elements.resetCurrent.disabled = !photo;
-  elements.filters.forEach((button) => {
-    const active = edit.filter === button.dataset.filter;
-    button.disabled = !photo;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
-
+function renderAdjustmentControls(photo, edit) {
   elements.adjustmentTabs.forEach((button) => {
     const id = button.dataset.adjustment;
     const active = id === state.activeAdjustment;
@@ -183,6 +172,28 @@ function renderControls() {
   elements.valueInput.closest("label").setAttribute("aria-label", config.label + " value");
   const progress = ((config.value - config.min) / (config.max - config.min)) * 100;
   elements.slider.style.setProperty("--range-progress", progress + "%");
+}
+
+function renderControls() {
+  const photo = currentPhoto();
+  const edit = photo ? photo.edit : createNeutralEdit();
+  elements.stage.classList.toggle("has-photo", Boolean(photo));
+  elements.compareButton.hidden = !photo;
+  renderCompareState(photo);
+  elements.deleteButton.hidden = !photo;
+  elements.photoCount.hidden = !photo;
+  elements.photoCount.textContent = photo ? state.activeIndex + 1 + " / " + state.photos.length : "";
+  elements.exportButton.disabled = !photo || state.busy;
+  elements.applyAll.disabled = state.photos.length < 2;
+  elements.resetCurrent.disabled = !photo;
+  elements.filters.forEach((button) => {
+    const active = edit.filter === button.dataset.filter;
+    button.disabled = !photo;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+
+  renderAdjustmentControls(photo, edit);
   renderThumbnails();
 }
 
@@ -203,13 +214,23 @@ async function prepareSource() {
     const scale = Math.min(1, PREVIEW_LONG_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
     const width = Math.max(1, Math.round(image.naturalWidth * scale));
     const height = Math.max(1, Math.round(image.naturalHeight * scale));
-    elements.canvas.width = width;
-    elements.canvas.height = height;
-    const context = elements.canvas.getContext("2d", { willReadFrequently: true });
+    const sourceCanvas = document.createElement("canvas");
+    sourceCanvas.width = width;
+    sourceCanvas.height = height;
+    const context = sourceCanvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("Canvas unavailable");
     context.clearRect(0, 0, width, height);
     context.drawImage(image, 0, 0, width, height);
     state.sourceData = context.getImageData(0, 0, width, height);
+    if (gpuPreview) {
+      gpuPreview.setSource(state.sourceData);
+    } else {
+      elements.canvas.width = width;
+      elements.canvas.height = height;
+      const previewContext = elements.canvas.getContext("2d", { willReadFrequently: true });
+      if (!previewContext) throw new Error("Canvas unavailable");
+      previewContext.putImageData(state.sourceData, 0, 0);
+    }
     photo.width = image.naturalWidth;
     photo.height = image.naturalHeight;
     setStatus("照片已载入");
@@ -224,6 +245,10 @@ function queuePreview() {
   state.renderFrame = window.requestAnimationFrame(() => {
     const photo = currentPhoto();
     if (!photo || !state.sourceData) return;
+    if (gpuPreview) {
+      gpuPreview.render(photo.edit, photo.grainSeed, state.showOriginal);
+      return;
+    }
     const context = elements.canvas.getContext("2d");
     if (!context) return;
     const pixels = state.showOriginal
@@ -522,11 +547,12 @@ document.querySelector(".interaction-surface").addEventListener("dragstart", (ev
 
 window.addEventListener("beforeunload", () => {
   state.photos.forEach((photo) => URL.revokeObjectURL(photo.url));
+  gpuPreview?.destroy();
 });
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=38", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=39", { scope: "./" }).catch(() => {});
   });
 }
 

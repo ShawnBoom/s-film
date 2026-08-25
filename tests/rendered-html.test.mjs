@@ -251,7 +251,7 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /\.filter-button\s*\{[^}]*color:\s*rgba\(243, 232, 204, 0\.5\)[^}]*font-family:\s*var\(--font-schoolbook\)[^}]*font-size:\s*12px[^}]*font-style:\s*normal/s);
     assert.match(styles, /\.filter-label\s*\{[^}]*flex-direction:\s*column[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*text-align:\s*center/s);
     assert.match(styles, /background:\s*var\(--privacy-dot\)/);
-    assert.match(styles, /\.filter-button\.is-active\s*\{[^}]*color:\s*var\(--control-surface\)[^}]*font-style:\s*italic/s);
+    assert.match(styles, /\.filter-button\.is-active\s*\{[^}]*color:\s*var\(--privacy-dot\)[^}]*font-style:\s*italic/s);
     assert.match(styles, /\.filter-row\s*\{[^}]*grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\)[^}]*grid-template-rows:\s*repeat\(2, minmax\(0, 1fr\)\)[^}]*flex:\s*0 0 68px[^}]*min-height:\s*68px/s);
     assert.doesNotMatch(styles, /\.filter-button\s*\{[^}]*border-right/s);
     assert.doesNotMatch(styles, /\.filter-button:nth-child\(7n\)/);
@@ -292,27 +292,53 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=38"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=38"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=38"/);
-  assert.match(staticWorker, /see-static-v38/);
-  assert.match(staticWorker, /image-engine\.js\?v=38/);
-  assert.match(staticWorker, /edit-state\.js\?v=38/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=38/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=38/);
-  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=38/);
-  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=38/);
-  assert.match(staticWorker, /s05-superia400-lut\.js\?v=38/);
-  assert.match(staticWorker, /s06-color100-lut\.js\?v=38/);
-  assert.match(staticWorker, /s07-color800z-lut\.js\?v=38/);
-  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=38/);
-  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=38/);
-  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=38/);
-  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=38/);
-  assert.match(staticWorker, /s12-portra400-lut\.js\?v=38/);
-  assert.match(staticWorker, /s13-gold200-lut\.js\?v=38/);
-  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=38/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=39"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=39"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=39"/);
+  assert.match(staticWorker, /see-static-v39/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=39/);
+  assert.match(staticWorker, /image-engine\.js\?v=39/);
+  assert.match(staticWorker, /edit-state\.js\?v=39/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=39/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=39/);
+  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=39/);
+  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=39/);
+  assert.match(staticWorker, /s05-superia400-lut\.js\?v=39/);
+  assert.match(staticWorker, /s06-color100-lut\.js\?v=39/);
+  assert.match(staticWorker, /s07-color800z-lut\.js\?v=39/);
+  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=39/);
+  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=39/);
+  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=39/);
+  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=39/);
+  assert.match(staticWorker, /s12-portra400-lut\.js\?v=39/);
+  assert.match(staticWorker, /s13-gold200-lut\.js\?v=39/);
+  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=39/);
   assert.match(staticWorker, /see-welcome\.png/);
   assert.match(appWorker, /see-v21/);
   assert.match(appWorker, /see-welcome\.png/);
+});
+
+test("uses a GPU live preview without changing the CPU export pipeline", async () => {
+  const [page, staticApp, gpuPreview, engine] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/gpu-preview.js", import.meta.url), "utf8"),
+    readFile(new URL("../lib/image-engine.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /createGpuPreviewRenderer/);
+  assert.match(page, /gpuPreviewRef\.current\.render\(currentEdit, currentPhoto\.grainSeed, showOriginal\)/);
+  assert.match(staticApp, /createGpuPreviewRenderer/);
+  assert.match(staticApp, /gpuPreview\.render\(photo\.edit, photo\.grainSeed, state\.showOriginal\)/);
+  assert.match(gpuPreview, /canvas\.getContext\("webgl2"/);
+  assert.match(gpuPreview, /uniform sampler3D uLut/);
+  assert.match(gpuPreview, /vec3 applyExposure/);
+  assert.match(gpuPreview, /vec3 applyColor/);
+  assert.match(gpuPreview, /vec3 applyGrain/);
+  assert.match(engine, /export function getFilterLut/);
+  assert.match(staticApp, /const pixels = processPixels\(source, photo\.edit, photo\.grainSeed\)/);
+
+  const sliderUpdate = staticApp.match(/function updateAdjustmentValue\(value\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(sliderUpdate, /renderAdjustmentControls/);
+  assert.doesNotMatch(sliderUpdate, /renderControls\(\)/);
 });

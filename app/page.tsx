@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
+import { createGpuPreviewRenderer } from "../lib/gpu-preview.js";
 import { hashSeed, processPixels } from "../lib/image-engine.js";
 import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
 
@@ -173,6 +174,8 @@ export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const sourceDataRef = useRef<ImageData | null>(null);
+  const gpuPreviewRef = useRef<ReturnType<typeof createGpuPreviewRenderer>>(null);
+  const gpuPreviewAttemptedRef = useRef(false);
   const renderFrameRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const photosRef = useRef<PhotoItem[]>([]);
@@ -232,6 +235,7 @@ export default function Home() {
   useEffect(() => {
     return () => {
       for (const photo of photosRef.current) URL.revokeObjectURL(photo.url);
+      gpuPreviewRef.current?.destroy();
       if (renderFrameRef.current) cancelAnimationFrame(renderFrameRef.current);
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     };
@@ -251,13 +255,29 @@ export default function Home() {
         const scale = Math.min(1, PREVIEW_LONG_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
         const width = Math.max(1, Math.round(image.naturalWidth * scale));
         const height = Math.max(1, Math.round(image.naturalHeight * scale));
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext("2d", { willReadFrequently: true });
+        const sourceCanvas = document.createElement("canvas");
+        sourceCanvas.width = width;
+        sourceCanvas.height = height;
+        const context = sourceCanvas.getContext("2d", { willReadFrequently: true });
         if (!context) throw new Error("当前浏览器无法处理照片");
         context.clearRect(0, 0, width, height);
         context.drawImage(image, 0, 0, width, height);
-        sourceDataRef.current = context.getImageData(0, 0, width, height);
+        const sourceData = context.getImageData(0, 0, width, height);
+        sourceDataRef.current = sourceData;
+
+        if (!gpuPreviewAttemptedRef.current) {
+          gpuPreviewAttemptedRef.current = true;
+          gpuPreviewRef.current = createGpuPreviewRenderer(canvas);
+        }
+        if (gpuPreviewRef.current) {
+          gpuPreviewRef.current.setSource(sourceData);
+        } else {
+          canvas.width = width;
+          canvas.height = height;
+          const previewContext = canvas.getContext("2d", { willReadFrequently: true });
+          if (!previewContext) throw new Error("当前浏览器无法处理照片");
+          previewContext.putImageData(sourceData, 0, 0);
+        }
         setPhotos((items) =>
           items.map((item) =>
             item.id === currentPhotoId
@@ -284,6 +304,10 @@ export default function Home() {
       const canvas = canvasRef.current;
       const source = sourceDataRef.current;
       if (!canvas || !source || !currentPhoto) return;
+      if (gpuPreviewRef.current) {
+        gpuPreviewRef.current.render(currentEdit, currentPhoto.grainSeed, showOriginal);
+        return;
+      }
       const context = canvas.getContext("2d");
       if (!context) return;
       const pixels = showOriginal

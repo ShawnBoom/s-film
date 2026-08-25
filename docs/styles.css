@@ -331,7 +331,7 @@ input:focus-visible {
 }
 
 .filter-button.is-active {
-  color: var(--control-surface);
+  color: var(--privacy-dot);
   font-style: italic;
 }
 
