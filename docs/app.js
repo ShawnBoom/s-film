@@ -1,9 +1,9 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=51";
-import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=51";
-import { createExportProcessor } from "./export-processor.js?v=51";
-import { hashSeed, processPixels } from "./image-engine.js?v=51";
-import { loadFilterLut } from "./lut-loader.js?v=51";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=51";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=52";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=52";
+import { createExportProcessor } from "./export-processor.js?v=52";
+import { hashSeed, processPixels } from "./image-engine.js?v=52";
+import { loadFilterLut } from "./lut-loader.js?v=52";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=52";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -96,7 +96,7 @@ function ensureExportProcessor() {
   if (exportProcessor) return exportProcessor;
   exportProcessor = createExportProcessor({
     createWorker: () => new Worker(
-      new URL("./export-worker.js?v=51", import.meta.url),
+      new URL("./export-worker.js?v=52", import.meta.url),
       { type: "module" },
     ),
     onWorkerCreated() {
@@ -890,7 +890,7 @@ window.addEventListener("beforeunload", () => {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     markStartup("window load");
-    navigator.serviceWorker.register("./sw.js?v=51", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=52", { scope: "./" }).catch(() => {});
     if (DEBUG_MODE) updateDiagnosticOverlay();
   });
 }

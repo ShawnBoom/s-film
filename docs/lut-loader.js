@@ -1,4 +1,4 @@
-import { getFilterLut, registerFilterLut } from "./image-engine.js?v=51";
+import { getFilterLut, registerFilterLut } from "./image-engine.js?v=52";
 
 export const FILTER_LUT_MANIFEST = Object.freeze({
   classic: Object.freeze({ module: "s01-classic-neg-lut.js", size: 33 }),
@@ -18,20 +18,20 @@ export const FILTER_LUT_MANIFEST = Object.freeze({
 });
 
 const LOADERS = Object.freeze({
-  classic: () => import("./s01-classic-neg-lut.js?v=51"),
-  gold: () => import("./s02-classic-chrome-lut.js?v=51"),
-  youth: () => import("./s03-classic-chrome-lut.js?v=51"),
-  slot04: () => import("./s04-pro400h-lut.js?v=51"),
-  slot05: () => import("./s05-superia400-lut.js?v=51"),
-  slot06: () => import("./s06-color100-lut.js?v=51"),
-  slot07: () => import("./s07-color800z-lut.js?v=51"),
-  slot08: () => import("./s08-gold-blue-lut.js?v=51"),
-  slot09: () => import("./s09-portra-cool-lut.js?v=51"),
-  slot10: () => import("./s10-proimage-original-lut.js?v=51"),
-  slot11: () => import("./s11-ektar100-lut.js?v=51"),
-  slot12: () => import("./s12-portra400-lut.js?v=51"),
-  slot13: () => import("./s13-gold200-lut.js?v=51"),
-  slot14: () => import("./s14-chrome64-lut.js?v=51"),
+  classic: () => import("./s01-classic-neg-lut.js?v=52"),
+  gold: () => import("./s02-classic-chrome-lut.js?v=52"),
+  youth: () => import("./s03-classic-chrome-lut.js?v=52"),
+  slot04: () => import("./s04-pro400h-lut.js?v=52"),
+  slot05: () => import("./s05-superia400-lut.js?v=52"),
+  slot06: () => import("./s06-color100-lut.js?v=52"),
+  slot07: () => import("./s07-color800z-lut.js?v=52"),
+  slot08: () => import("./s08-gold-blue-lut.js?v=52"),
+  slot09: () => import("./s09-portra-cool-lut.js?v=52"),
+  slot10: () => import("./s10-proimage-original-lut.js?v=52"),
+  slot11: () => import("./s11-ektar100-lut.js?v=52"),
+  slot12: () => import("./s12-portra400-lut.js?v=52"),
+  slot13: () => import("./s13-gold200-lut.js?v=52"),
+  slot14: () => import("./s14-chrome64-lut.js?v=52"),
 });
 
 const PICKERS = Object.freeze({
