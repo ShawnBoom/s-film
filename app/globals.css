@@ -1,27 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light dark;
-  --paper: #f4f2eb;
-  --ink: #171816;
-  --muted: #74756f;
-  --line: rgba(23, 24, 22, 0.16);
-  --panel: #e8e5dc;
+  color-scheme: dark;
+  --paper: #1b1c1a;
+  --ink: #f1f0ea;
+  --muted: #aaa9a2;
+  --line: rgba(241, 240, 234, 0.18);
+  --panel: #242522;
   --accent: #ffc926;
   --privacy-dot: #d52518;
   --control-surface: #f3e8cc;
   --control-ink: #171816;
   --font-schoolbook: "Century Schoolbook", "New Century Schoolbook", "Century751 BT", Century, Georgia, "HarmonyOS Sans SC", "HarmonyOS Sans", "PingFang SC", "Noto Sans SC", serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #1b1c1a;
-    --ink: #f1f0ea;
-    --muted: #aaa9a2;
-    --line: rgba(241, 240, 234, 0.18);
-    --panel: #242522;
-  }
 }
 
 * { box-sizing: border-box; }

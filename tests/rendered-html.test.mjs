@@ -171,11 +171,12 @@ test("preserves the supplied logo, cover, and welcome image bytes", async () => 
 });
 
 test("uses the requested filter labels and interface colors", async () => {
-  const [page, appStyles, staticHtml, staticStyles] = await Promise.all([
+  const [page, appStyles, staticHtml, staticStyles, layout] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../docs/index.html", import.meta.url), "utf8"),
     readFile(new URL("../docs/styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /label:\s*"Nostalgic Neg"/);
@@ -239,6 +240,8 @@ test("uses the requested filter labels and interface colors", async () => {
   assert.doesNotMatch(staticHtml, />S0[1-9]</);
   assert.doesNotMatch(staticHtml, />#S(?:0[1-9]|1[0-4])</);
   for (const styles of [appStyles, staticStyles]) {
+    assert.match(styles, /:root\s*\{[^}]*color-scheme:\s*dark[^}]*--paper:\s*#1b1c1a[^}]*--ink:\s*#f1f0ea[^}]*--panel:\s*#242522/s);
+    assert.doesNotMatch(styles, /prefers-color-scheme/);
     assert.match(styles, /--accent:\s*#ffc926/i);
     assert.match(styles, /--privacy-dot:\s*#d52518/i);
     assert.match(styles, /--control-surface:\s*#f3e8cc/i);
@@ -277,6 +280,8 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /overflow:\s*hidden/);
     assert.match(styles, /100dvh/);
   }
+  assert.match(layout, /themeColor:\s*"#1b1c1a"/);
+  assert.doesNotMatch(layout, /prefers-color-scheme/);
 });
 
 test("ships cache-busted, relative GitHub Pages assets", async () => {
@@ -287,26 +292,26 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=37"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=37"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=37"/);
-  assert.match(staticWorker, /see-static-v37/);
-  assert.match(staticWorker, /image-engine\.js\?v=37/);
-  assert.match(staticWorker, /edit-state\.js\?v=37/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=37/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=37/);
-  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=37/);
-  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=37/);
-  assert.match(staticWorker, /s05-superia400-lut\.js\?v=37/);
-  assert.match(staticWorker, /s06-color100-lut\.js\?v=37/);
-  assert.match(staticWorker, /s07-color800z-lut\.js\?v=37/);
-  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=37/);
-  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=37/);
-  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=37/);
-  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=37/);
-  assert.match(staticWorker, /s12-portra400-lut\.js\?v=37/);
-  assert.match(staticWorker, /s13-gold200-lut\.js\?v=37/);
-  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=37/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=38"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=38"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=38"/);
+  assert.match(staticWorker, /see-static-v38/);
+  assert.match(staticWorker, /image-engine\.js\?v=38/);
+  assert.match(staticWorker, /edit-state\.js\?v=38/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=38/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=38/);
+  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=38/);
+  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=38/);
+  assert.match(staticWorker, /s05-superia400-lut\.js\?v=38/);
+  assert.match(staticWorker, /s06-color100-lut\.js\?v=38/);
+  assert.match(staticWorker, /s07-color800z-lut\.js\?v=38/);
+  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=38/);
+  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=38/);
+  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=38/);
+  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=38/);
+  assert.match(staticWorker, /s12-portra400-lut\.js\?v=38/);
+  assert.match(staticWorker, /s13-gold200-lut\.js\?v=38/);
+  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=38/);
   assert.match(staticWorker, /see-welcome\.png/);
   assert.match(appWorker, /see-v21/);
   assert.match(appWorker, /see-welcome\.png/);
