@@ -1,4 +1,4 @@
-import { processPixels } from "./image-engine.js?v=42";
+import { processPixels } from "./image-engine.js?v=44";
 
 self.postMessage({ type: "ready" });
 

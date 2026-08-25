@@ -292,31 +292,32 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=42"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=42"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=42"/);
-  assert.match(staticWorker, /see-static-v42/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=42/);
-  assert.match(staticWorker, /export-processor\.js\?v=42/);
-  assert.match(staticWorker, /export-worker\.js\?v=42/);
-  assert.match(staticWorker, /image-engine\.js\?v=42/);
-  assert.match(staticWorker, /edit-state\.js\?v=42/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=42/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=42/);
-  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=42/);
-  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=42/);
-  assert.match(staticWorker, /s05-superia400-lut\.js\?v=42/);
-  assert.match(staticWorker, /s06-color100-lut\.js\?v=42/);
-  assert.match(staticWorker, /s07-color800z-lut\.js\?v=42/);
-  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=42/);
-  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=42/);
-  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=42/);
-  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=42/);
-  assert.match(staticWorker, /s12-portra400-lut\.js\?v=42/);
-  assert.match(staticWorker, /s13-gold200-lut\.js\?v=42/);
-  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=42/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=44"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=44"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=44"/);
+  assert.match(staticWorker, /see-static-v44/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=44/);
+  assert.match(staticWorker, /gpu-export-benchmark\.js\?v=44/);
+  assert.match(staticWorker, /export-processor\.js\?v=44/);
+  assert.match(staticWorker, /export-worker\.js\?v=44/);
+  assert.match(staticWorker, /image-engine\.js\?v=44/);
+  assert.match(staticWorker, /edit-state\.js\?v=44/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=44/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=44/);
+  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=44/);
+  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=44/);
+  assert.match(staticWorker, /s05-superia400-lut\.js\?v=44/);
+  assert.match(staticWorker, /s06-color100-lut\.js\?v=44/);
+  assert.match(staticWorker, /s07-color800z-lut\.js\?v=44/);
+  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=44/);
+  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=44/);
+  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=44/);
+  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=44/);
+  assert.match(staticWorker, /s12-portra400-lut\.js\?v=44/);
+  assert.match(staticWorker, /s13-gold200-lut\.js\?v=44/);
+  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=44/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-v22/);
+  assert.match(appWorker, /see-v23/);
   assert.match(appWorker, /see-welcome\.png/);
 });
 
@@ -341,7 +342,7 @@ test("uses a GPU live preview without changing the CPU export pipeline", async (
   assert.match(engine, /export function getFilterLut/);
   assert.match(staticApp, /await exportProcessor\.process\(source, photo\.edit, photo\.grainSeed\)/);
   assert.match(staticApp, /processPixels\(source, photo\.edit, photo\.grainSeed\)/);
-  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=42"/);
+  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=44"/);
   assert.match(exportWorker, /const pixels = processPixels\(source, message\.edit, message\.seed\)/);
 
   const sliderUpdate = staticApp.match(/function updateAdjustmentValue\(value\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
@@ -349,13 +350,14 @@ test("uses a GPU live preview without changing the CPU export pipeline", async (
   assert.doesNotMatch(sliderUpdate, /renderControls\(\)/);
 });
 
-test("shows preview diagnostics only for the temporary debug query mode", async () => {
-  const [page, staticHtml, staticApp, gpuPreview, sourceGpuPreview, staticStyles] = await Promise.all([
+test("shows preview and full-resolution GPU diagnostics only for debug query mode", async () => {
+  const [page, staticHtml, staticApp, gpuPreview, sourceGpuPreview, benchmark, staticStyles] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../docs/index.html", import.meta.url), "utf8"),
     readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
     readFile(new URL("../docs/gpu-preview.js", import.meta.url), "utf8"),
     readFile(new URL("../lib/gpu-preview.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/gpu-export-benchmark.js", import.meta.url), "utf8"),
     readFile(new URL("../docs/styles.css", import.meta.url), "utf8"),
   ]);
 
@@ -377,10 +379,27 @@ test("shows preview diagnostics only for the temporary debug query mode", async 
   assert.match(gpuPreview, /onError\?\.\(\{ stage: "probe", error \}\)/);
   assert.match(gpuPreview, /onError\?\.\(\{ stage: "renderer", error \}\)/);
   assert.match(gpuPreview, /precision highp sampler3D;/);
-  assert.match(sourceGpuPreview, /precision highp sampler3D;/);
-  assert.match(staticStyles, /\.diagnostic-overlay\s*\{[^}]*position:\s*absolute[^}]*pointer-events:\s*none/s);
+  assert.match(staticApp, /import\("\.\/gpu-export-benchmark\.js\?v=44"\)/);
+  assert.match(staticApp, /filterIds:\s*elements\.filters\.map/);
+  assert.match(staticApp, /Run GPU A\/B/);
+  assert.match(sourceGpuPreview, /createGpuExportBenchmarkRenderer/);
+  assert.match(sourceGpuPreview, /fenceSync/);
+  assert.match(sourceGpuPreview, /clientWaitSync/);
+  assert.match(sourceGpuPreview, /MAX_TEXTURE_SIZE/);
+  assert.match(sourceGpuPreview, /MAX_RENDERBUFFER_SIZE/);
+  assert.match(sourceGpuPreview, /MAX_VIEWPORT_DIMS/);
+  assert.match(sourceGpuPreview, /readPixels/);
+  assert.match(benchmark, /GPU_EXPORT_CASES/);
+  assert.match(benchmark, /exportProcessor\.process\(cpuSource, test\.edit, photo\.grainSeed\)/);
+  assert.match(benchmark, /comparePixelBuffers\(cpuPixels, gpuPixels\)/);
+  assert.match(benchmark, /filterIds\.length !== 14/);
+  assert.match(benchmark, /sourceContext\.drawImage\(image, 0, 0\)/);
+  assert.doesNotMatch(benchmark, /PREVIEW_LONG_EDGE|const scale\s*=/);
+  assert.match(staticStyles, /\.diagnostic-overlay\s*\{[^}]*position:\s*absolute[^}]*pointer-events:\s*auto/s);
   assert.doesNotMatch(staticHtml, /data-preview-diagnostics/);
+  assert.doesNotMatch(staticHtml, /Run GPU A\/B/);
   assert.match(page, /data-preview-diagnostics="true"/);
+  assert.match(page, /benchmarkBusy/);
   assert.match(page, /new URLSearchParams\(window\.location\.search\)\.get\("debug"\) === "1"/);
 });
 

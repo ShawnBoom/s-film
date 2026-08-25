@@ -1,4 +1,4 @@
-import { getFilterLut } from "./image-engine.js?v=42";
+import { getFilterLut } from "./image-engine.js?v=44";
 
 const VERTEX_SHADER = `#version 300 es
 in vec2 aPosition;
@@ -277,7 +277,7 @@ function location(gl, program, name) {
 }
 
 class GpuPreviewRenderer {
-  constructor(canvas) {
+  constructor(canvas, contextOptions = {}) {
     const gl = canvas.getContext("webgl2", {
       alpha: true,
       antialias: false,
@@ -285,6 +285,7 @@ class GpuPreviewRenderer {
       powerPreference: "high-performance",
       preserveDrawingBuffer: false,
       stencil: false,
+      ...contextOptions,
     });
     if (!gl) throw new Error("WebGL 2 is unavailable");
 
@@ -452,6 +453,139 @@ class GpuPreviewRenderer {
   }
 }
 
+function flipRowsInPlace(pixels, width, height) {
+  const rowLength = width * 4;
+  const temporary = new Uint8Array(rowLength);
+  for (let top = 0, bottom = height - 1; top < bottom; top += 1, bottom -= 1) {
+    const topOffset = top * rowLength;
+    const bottomOffset = bottom * rowLength;
+    temporary.set(pixels.subarray(topOffset, topOffset + rowLength));
+    pixels.copyWithin(topOffset, bottomOffset, bottomOffset + rowLength);
+    pixels.set(temporary, bottomOffset);
+  }
+}
+
+async function waitForGpu(gl) {
+  const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (!sync) {
+    const startedAt = performance.now();
+    gl.finish();
+    return performance.now() - startedAt;
+  }
+
+  const startedAt = performance.now();
+  gl.flush();
+  try {
+    while (true) {
+      if (gl.isContextLost()) throw new Error("GPU export context was lost");
+      const status = gl.clientWaitSync(sync, 0, 0);
+      if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
+        return performance.now() - startedAt;
+      }
+      if (status === gl.WAIT_FAILED) throw new Error("GPU export synchronization failed");
+      if (performance.now() - startedAt > 30000) {
+        throw new Error("GPU export synchronization timed out");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  } finally {
+    gl.deleteSync(sync);
+  }
+}
+
+class GpuExportBenchmarkRenderer extends GpuPreviewRenderer {
+  constructor(canvas) {
+    super(canvas, { premultipliedAlpha: false });
+  }
+
+  assertNoError(stage) {
+    const error = this.gl.getError();
+    if (error !== this.gl.NO_ERROR) throw new Error(`${stage} WebGL error: 0x${error.toString(16)}`);
+  }
+
+  capabilities(width, height) {
+    const { gl } = this;
+    const maxViewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+    const limits = {
+      maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+      maxRenderbufferSize: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+      maxViewportWidth: maxViewport[0],
+      maxViewportHeight: maxViewport[1],
+    };
+    return {
+      ...limits,
+      fullSizeRenderPossible: width <= limits.maxTextureSize
+        && height <= limits.maxTextureSize
+        && width <= limits.maxRenderbufferSize
+        && height <= limits.maxRenderbufferSize
+        && width <= limits.maxViewportWidth
+        && height <= limits.maxViewportHeight,
+    };
+  }
+
+  verifyFilters(filters) {
+    return filters.map((filter) => {
+      const available = this.setFilter(filter);
+      this.assertNoError(`LUT ${filter}`);
+      return { filter, available };
+    });
+  }
+
+  async renderPixels(source, edit, seed) {
+    const totalStartedAt = performance.now();
+
+    const uploadStartedAt = performance.now();
+    this.setSource(source);
+    this.assertNoError("Source upload");
+    const upload = performance.now() - uploadStartedAt;
+
+    const lutStartedAt = performance.now();
+    const hasLut = this.setFilter(edit.filter ?? null);
+    this.assertNoError("LUT preparation");
+    const lut = performance.now() - lutStartedAt;
+    if (edit.filter && !hasLut) throw new Error(`GPU export LUT is unavailable: ${edit.filter}`);
+
+    const submissionStartedAt = performance.now();
+    this.render(edit, seed, false);
+    this.assertNoError("Draw submission");
+    const submission = performance.now() - submissionStartedAt;
+    const completion = await waitForGpu(this.gl);
+
+    const readPixelsStartedAt = performance.now();
+    const bytes = new Uint8ClampedArray(source.width * source.height * 4);
+    this.gl.readPixels(
+      0,
+      0,
+      source.width,
+      source.height,
+      this.gl.RGBA,
+      this.gl.UNSIGNED_BYTE,
+      bytes,
+    );
+    this.assertNoError("Pixel readback");
+    const readPixels = performance.now() - readPixelsStartedAt;
+
+    const rowFlipStartedAt = performance.now();
+    flipRowsInPlace(bytes, source.width, source.height);
+    const rowFlip = performance.now() - rowFlipStartedAt;
+
+    return {
+      pixels: bytes,
+      timings: {
+        upload,
+        lut,
+        submission,
+        completion,
+        processing: submission + completion,
+        readPixels,
+        rowFlip,
+        readback: readPixels + rowFlip,
+        totalPixelsReady: performance.now() - totalStartedAt,
+      },
+    };
+  }
+}
+
 export function createGpuPreviewRenderer(canvas, options = {}) {
   const onError = typeof options.onError === "function" ? options.onError : null;
   try {
@@ -467,6 +601,17 @@ export function createGpuPreviewRenderer(canvas, options = {}) {
     return new GpuPreviewRenderer(canvas);
   } catch (error) {
     onError?.({ stage: "renderer", error });
+    return null;
+  }
+}
+
+export function createGpuExportBenchmarkRenderer(options = {}) {
+  const onError = typeof options.onError === "function" ? options.onError : null;
+  try {
+    const canvas = document.createElement("canvas");
+    return new GpuExportBenchmarkRenderer(canvas);
+  } catch (error) {
+    onError?.(error);
     return null;
   }
 }

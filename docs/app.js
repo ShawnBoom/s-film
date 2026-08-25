@@ -1,7 +1,7 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=42";
-import { createExportProcessor } from "./export-processor.js?v=42";
-import { hashSeed, processPixels } from "./image-engine.js?v=42";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=42";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=44";
+import { createExportProcessor } from "./export-processor.js?v=44";
+import { hashSeed, processPixels } from "./image-engine.js?v=44";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=44";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -13,6 +13,7 @@ const state = {
   activeAdjustment: "brightness",
   showOriginal: false,
   busy: false,
+  benchmarkBusy: false,
   sourceData: null,
   renderFrame: 0,
   loadToken: 0,
@@ -54,6 +55,7 @@ const diagnostics = {
     jpeg: null,
     total: null,
   },
+  gpuExportLines: ["", "GPU EXPORT A/B", "Ready", "Add a photo, then tap Run GPU A/B."],
 };
 
 const gpuPreview = DEBUG_MODE
@@ -67,7 +69,7 @@ const gpuPreview = DEBUG_MODE
 const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
 const exportProcessor = createExportProcessor({
   createWorker: () => new Worker(
-    new URL("./export-worker.js?v=42", import.meta.url),
+    new URL("./export-worker.js?v=44", import.meta.url),
     { type: "module" },
   ),
   onFailure(error) {
@@ -83,8 +85,15 @@ function createDiagnosticOverlay() {
   overlay.className = "diagnostic-overlay";
   overlay.dataset.previewDiagnostics = "true";
   overlay.setAttribute("aria-label", "Preview diagnostics");
+  const output = document.createElement("pre");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "gpu-benchmark-button";
+  button.textContent = "Run GPU A/B";
+  button.addEventListener("click", () => void runGpuExportBenchmark());
+  overlay.append(output, button);
   document.querySelector(".editor-card")?.append(overlay);
-  return overlay;
+  return { root: overlay, output, button };
 }
 
 function updateDiagnosticOverlay() {
@@ -111,7 +120,7 @@ function updateDiagnosticOverlay() {
     : "Main-thread processPixels";
   const duration = (value) => value === null ? "—" : value.toFixed(1) + " ms";
 
-  diagnosticOverlay.textContent = [
+  diagnosticOverlay.output.textContent = [
     "Preview: " + (path === "gpu" ? "WebGL2 GPU" : "CPU fallback"),
     gpuPreview ? "GPU init: OK" : "GPU init failed: " + (diagnostics.initError || "Unknown error"),
     timingLabel + ": " + (diagnostics.lastPath === path && diagnostics.lastDuration !== null
@@ -132,7 +141,51 @@ function updateDiagnosticOverlay() {
     "putImageData: " + duration(exportTiming.put),
     "JPEG encoding: " + duration(exportTiming.jpeg),
     "File ready: " + duration(exportTiming.total),
+    ...diagnostics.gpuExportLines,
   ].join("\n");
+  diagnosticOverlay.button.disabled = !photo || state.busy || state.benchmarkBusy;
+  diagnosticOverlay.button.textContent = state.benchmarkBusy ? "Testing…" : "Run GPU A/B";
+}
+
+async function runGpuExportBenchmark() {
+  const photo = currentPhoto();
+  if (!DEBUG_MODE || !photo || state.busy || state.benchmarkBusy) return;
+  state.benchmarkBusy = true;
+  diagnostics.gpuExportLines = ["", "GPU EXPORT A/B", "Loading benchmark…"];
+  renderControls();
+  updateDiagnosticOverlay();
+
+  try {
+    const benchmark = await import("./gpu-export-benchmark.js?v=44");
+    const snapshot = {
+      url: photo.url,
+      edit: { ...photo.edit },
+      grainSeed: photo.grainSeed,
+    };
+    const result = await benchmark.runGpuExportABBenchmark({
+      photo: snapshot,
+      filterIds: elements.filters.map((button) => button.dataset.filter),
+      exportProcessor,
+      onProgress(progress) {
+        diagnostics.gpuExportLines = benchmark.formatGpuExportBenchmark(
+          progress.result ?? null,
+          progress.message,
+        );
+        updateDiagnosticOverlay();
+      },
+    });
+    diagnostics.gpuExportLines = benchmark.formatGpuExportBenchmark(result, "Complete");
+  } catch (error) {
+    diagnostics.gpuExportLines = [
+      "",
+      "GPU EXPORT A/B",
+      "Failed: " + (error instanceof Error ? error.message : String(error)),
+    ];
+  } finally {
+    state.benchmarkBusy = false;
+    renderControls();
+    updateDiagnosticOverlay();
+  }
 }
 
 function updateExportDiagnostics(patch) {
@@ -298,7 +351,7 @@ function renderControls() {
   elements.deleteButton.hidden = !photo;
   elements.photoCount.hidden = !photo;
   elements.photoCount.textContent = photo ? state.activeIndex + 1 + " / " + state.photos.length : "";
-  elements.exportButton.disabled = !photo || state.busy;
+  elements.exportButton.disabled = !photo || state.busy || state.benchmarkBusy;
   elements.exportButton.textContent = state.busy ? "Saving…" : "Save";
   elements.exportButton.setAttribute("aria-busy", String(state.busy));
   elements.applyAll.disabled = state.photos.length < 2;
@@ -735,7 +788,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=42", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=44", { scope: "./" }).catch(() => {});
   });
 }
 

@@ -179,6 +179,13 @@ export default function Home() {
   const [adjustmentDraft, setAdjustmentDraft] = useState("0");
   const [debugMode, setDebugMode] = useState(false);
   const [debugVersion, setDebugVersion] = useState(0);
+  const [benchmarkBusy, setBenchmarkBusy] = useState(false);
+  const [gpuExportLines, setGpuExportLines] = useState([
+    "",
+    "GPU EXPORT A/B",
+    "Ready",
+    "Add a photo, then tap Run GPU A/B.",
+  ]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -628,6 +635,43 @@ export default function Home() {
     }
   }
 
+  async function runGpuExportBenchmark() {
+    const photo = currentPhoto;
+    const processor = exportProcessorRef.current;
+    if (!debugMode || !photo || !processor || busy || benchmarkBusy) return;
+    setBenchmarkBusy(true);
+    setGpuExportLines(["", "GPU EXPORT A/B", "Loading benchmark…"]);
+
+    try {
+      const benchmark = await import("../lib/gpu-export-benchmark.js");
+      const snapshot = {
+        url: photo.url,
+        edit: { ...photo.edit },
+        grainSeed: photo.grainSeed,
+      };
+      const result = await benchmark.runGpuExportABBenchmark({
+        photo: snapshot,
+        filterIds: FILTERS.map(({ id }) => id),
+        exportProcessor: processor,
+        onProgress(progress: { result?: unknown; message: string }) {
+          setGpuExportLines(benchmark.formatGpuExportBenchmark(
+            progress.result ?? null,
+            progress.message,
+          ));
+        },
+      });
+      setGpuExportLines(benchmark.formatGpuExportBenchmark(result, "Complete"));
+    } catch (error) {
+      setGpuExportLines([
+        "",
+        "GPU EXPORT A/B",
+        "Failed: " + (error instanceof Error ? error.message : String(error)),
+      ]);
+    } finally {
+      setBenchmarkBusy(false);
+    }
+  }
+
   const diagnosticPath = gpuPreviewRef.current ? "gpu" : "cpu";
   const diagnosticSamples = diagnosticsRef.current.samples[diagnosticPath];
   const diagnosticAverage = diagnosticSamples.length
@@ -672,6 +716,7 @@ export default function Home() {
     "putImageData: " + exportDuration(exportTiming.put),
     "JPEG encoding: " + exportDuration(exportTiming.jpeg),
     "File ready: " + exportDuration(exportTiming.total),
+    ...gpuExportLines,
   ].join("\n");
   void debugVersion;
 
@@ -692,7 +737,15 @@ export default function Home() {
             data-preview-diagnostics="true"
             aria-label="Preview diagnostics"
           >
-            {diagnosticText}
+            <pre>{diagnosticText}</pre>
+            <button
+              className="gpu-benchmark-button"
+              type="button"
+              disabled={!currentPhoto || busy || benchmarkBusy}
+              onClick={() => void runGpuExportBenchmark()}
+            >
+              {benchmarkBusy ? "Testing…" : "Run GPU A/B"}
+            </button>
           </aside>
         )}
 
@@ -886,7 +939,7 @@ export default function Home() {
           <button
             className="bottom-action save-action"
             type="button"
-            disabled={!photos.length || busy}
+            disabled={!photos.length || busy || benchmarkBusy}
             aria-busy={busy}
             onClick={() => void exportPhotos()}
           >
