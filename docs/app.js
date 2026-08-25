@@ -1,4 +1,5 @@
-import { hashSeed, processPixels } from "./image-engine.js?v=34";
+import { hashSeed, processPixels } from "./image-engine.js?v=36";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=36";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -80,11 +81,19 @@ function clampAdjustment(value, min, max) {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
 
-function setShowOriginal(value) {
-  state.showOriginal = Boolean(value && currentPhoto());
-  elements.compareButton.classList.toggle("is-active", state.showOriginal);
+function renderCompareState(photo = currentPhoto()) {
+  const edit = photo ? photo.edit : createNeutralEdit();
+  if (!photo || !hasEdits(edit)) state.showOriginal = false;
+  const label = visibleEditLabel(edit, state.showOriginal);
+  elements.compareButton.classList.toggle("is-active", label === "Edited");
   elements.compareButton.setAttribute("aria-pressed", String(state.showOriginal));
-  elements.compareButton.textContent = state.showOriginal ? "Edited" : "Original";
+  elements.compareButton.textContent = label;
+}
+
+function setShowOriginal(value) {
+  const photo = currentPhoto();
+  state.showOriginal = Boolean(value && photo && hasEdits(photo.edit));
+  renderCompareState(photo);
   queuePreview();
 }
 
@@ -137,6 +146,7 @@ function renderControls() {
   const edit = photo ? photo.edit : createNeutralEdit();
   elements.stage.classList.toggle("has-photo", Boolean(photo));
   elements.compareButton.hidden = !photo;
+  renderCompareState(photo);
   elements.deleteButton.hidden = !photo;
   elements.photoCount.hidden = !photo;
   elements.photoCount.textContent = photo ? state.activeIndex + 1 + " / " + state.photos.length : "";
@@ -516,7 +526,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=34", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=36", { scope: "./" }).catch(() => {});
   });
 }
 

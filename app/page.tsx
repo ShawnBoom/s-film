@@ -6,20 +6,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { hashSeed, processPixels } from "../lib/image-engine.js";
+import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
 
 const FILTERS = [
-  { id: "classic", label: "S01", name: "FUJI Classic Chrome" },
-  { id: "gold", label: "S02", name: "KODAK Gold 200" },
-  { id: "youth", label: "S03", name: "FUJI Youth Blue" },
-  { id: "slot04", label: "S04", name: "" },
-  { id: "slot05", label: "S05", name: "" },
-  { id: "slot06", label: "S06", name: "" },
-  { id: "slot07", label: "S07", name: "" },
-  { id: "slot08", label: "S08", name: "" },
-  { id: "slot09", label: "S09", name: "" },
-  { id: "slot10", label: "S10", name: "" },
-  { id: "slot11", label: "S11", name: "" },
-  { id: "slot12", label: "S12", name: "" },
+  { id: "classic", label: "Nostalgic Neg", name: "FUJI Nostalgic Neg" },
+  { id: "gold", label: "Classic Neg", name: "FUJI Classic Neg" },
+  { id: "youth", label: "Classic Chrome", name: "FUJI Classic Chrome" },
+  { id: "slot07", label: "Color 800Z", name: "FUJI Color 800Z" },
+  { id: "slot06", label: "Color 100", name: "FUJI Color 100" },
+  { id: "slot04", label: "Provia 400H", name: "FUJI Pro 400H" },
+  { id: "slot05", label: "Superia 400", name: "FUJI Superia 400" },
+  { id: "slot12", label: "Portra 400", name: "KODAK Portra 400" },
+  { id: "slot09", label: "Portra Cool", name: "KODAK Portra Cool" },
+  { id: "slot13", label: "Gold 200", name: "KODAK Gold 200" },
+  { id: "slot08", label: "Gold Blue", name: "KODAK Gold Blue" },
+  { id: "slot10", label: "Proimage 100", name: "KODAK Proimage 100" },
+  { id: "slot11", label: "Ektar 100", name: "KODAK Ektar 100" },
+  { id: "slot14", label: "Chrome 64", name: "KODAK Chrome 64" },
 ] as const;
 
 type FilterId = (typeof FILTERS)[number]["id"];
@@ -176,6 +179,8 @@ export default function Home() {
 
   const currentPhoto = photos[activeIndex] ?? null;
   const currentEdit = currentPhoto?.edit ?? createNeutralEdit();
+  const currentHasEdits = Boolean(currentPhoto && hasEdits(currentEdit));
+  const currentVisibleLabel = visibleEditLabel(currentEdit, showOriginal);
   const currentPhotoId = currentPhoto?.id ?? "";
   const sourceUrl = currentPhoto?.url ?? "";
 
@@ -476,12 +481,14 @@ export default function Home() {
           {currentPhoto && (
             <>
               <button
-                className={"compare-button" + (showOriginal ? " is-active" : "")}
+                className={"compare-button" + (currentVisibleLabel === "Edited" ? " is-active" : "")}
                 type="button"
                 aria-pressed={showOriginal}
-                onClick={() => setShowOriginal((value) => !value)}
+                onClick={() => {
+                  if (currentHasEdits) setShowOriginal((value) => !value);
+                }}
               >
-                {showOriginal ? "Edited" : "Original"}
+                {currentVisibleLabel}
               </button>
               <button
                 className="delete-button"
@@ -538,7 +545,11 @@ export default function Home() {
               disabled={!currentPhoto}
               onClick={() => updateCurrentEdit({ filter: filter.id })}
             >
-              {filter.label}
+              <span className="filter-label">
+                {filter.label.split(" ").map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </span>
             </button>
           ))}
         </section>

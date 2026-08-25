@@ -303,7 +303,7 @@ input:focus-visible {
 
 .filter-row {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   flex: 0 0 68px;
   min-height: 68px;
@@ -317,23 +317,32 @@ input:focus-visible {
   min-width: 0;
   padding: 0;
   border: 0;
-  border-right: 0.5px solid var(--line);
   background: transparent;
   color: rgba(243, 232, 204, 0.5);
   cursor: pointer;
   font-family: var(--font-schoolbook);
-  font-size: 11px;
-  font-style: italic;
+  font-size: 12px;
+  font-style: normal;
   font-weight: 400;
   letter-spacing: 0.055em;
 }
 
-.filter-button:nth-child(6n) { border-right: 0; }
+.filter-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
+  text-align: center;
+}
 
-.filter-button:nth-child(-n + 6) { border-bottom: 0.5px solid var(--line); }
+.filter-button:nth-child(-n + 7) {
+  border-bottom: 0.5px solid rgba(243, 232, 204, 0.08);
+}
 
 .filter-button.is-active {
   color: var(--control-surface);
+  font-style: italic;
 }
 
 .filter-button:disabled,
@@ -358,14 +367,16 @@ input:focus-visible {
 }
 
 .adjustment-tab {
+  width: 70px;
   min-height: 26px;
   padding: 0 4px;
+  justify-self: center;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: rgba(243, 232, 204, 0.5);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .adjustment-tab.is-active {
@@ -424,7 +435,7 @@ input:focus-visible {
   border-bottom: 0.5px solid transparent;
   color: var(--control-surface);
   font-family: var(--font-schoolbook);
-  font-size: 10px;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -462,14 +473,16 @@ input:focus-visible {
 }
 
 .bottom-action {
+  width: fit-content;
   min-width: 0;
   padding: 0 8px;
+  justify-self: center;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: rgba(243, 232, 204, 0.5);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .save-action {
@@ -478,6 +491,8 @@ input:focus-visible {
 }
 
 .bottom-action:active:not(:disabled) {
+  padding-right: 5px;
+  padding-left: 5px;
   border-color: var(--privacy-dot);
   background: var(--privacy-dot);
   color: var(--accent);
