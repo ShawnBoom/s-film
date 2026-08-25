@@ -292,38 +292,41 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=41"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=41"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=41"/);
-  assert.match(staticWorker, /see-static-v41/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=41/);
-  assert.match(staticWorker, /image-engine\.js\?v=41/);
-  assert.match(staticWorker, /edit-state\.js\?v=41/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=41/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=41/);
-  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=41/);
-  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=41/);
-  assert.match(staticWorker, /s05-superia400-lut\.js\?v=41/);
-  assert.match(staticWorker, /s06-color100-lut\.js\?v=41/);
-  assert.match(staticWorker, /s07-color800z-lut\.js\?v=41/);
-  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=41/);
-  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=41/);
-  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=41/);
-  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=41/);
-  assert.match(staticWorker, /s12-portra400-lut\.js\?v=41/);
-  assert.match(staticWorker, /s13-gold200-lut\.js\?v=41/);
-  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=41/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=42"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=42"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=42"/);
+  assert.match(staticWorker, /see-static-v42/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=42/);
+  assert.match(staticWorker, /export-processor\.js\?v=42/);
+  assert.match(staticWorker, /export-worker\.js\?v=42/);
+  assert.match(staticWorker, /image-engine\.js\?v=42/);
+  assert.match(staticWorker, /edit-state\.js\?v=42/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=42/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=42/);
+  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=42/);
+  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=42/);
+  assert.match(staticWorker, /s05-superia400-lut\.js\?v=42/);
+  assert.match(staticWorker, /s06-color100-lut\.js\?v=42/);
+  assert.match(staticWorker, /s07-color800z-lut\.js\?v=42/);
+  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=42/);
+  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=42/);
+  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=42/);
+  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=42/);
+  assert.match(staticWorker, /s12-portra400-lut\.js\?v=42/);
+  assert.match(staticWorker, /s13-gold200-lut\.js\?v=42/);
+  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=42/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-v21/);
+  assert.match(appWorker, /see-v22/);
   assert.match(appWorker, /see-welcome\.png/);
 });
 
 test("uses a GPU live preview without changing the CPU export pipeline", async () => {
-  const [page, staticApp, gpuPreview, engine] = await Promise.all([
+  const [page, staticApp, gpuPreview, engine, exportWorker] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
     readFile(new URL("../docs/gpu-preview.js", import.meta.url), "utf8"),
     readFile(new URL("../lib/image-engine.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/export-worker.js", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /createGpuPreviewRenderer/);
@@ -336,7 +339,10 @@ test("uses a GPU live preview without changing the CPU export pipeline", async (
   assert.match(gpuPreview, /vec3 applyColor/);
   assert.match(gpuPreview, /vec3 applyGrain/);
   assert.match(engine, /export function getFilterLut/);
-  assert.match(staticApp, /const pixels = processPixels\(source, photo\.edit, photo\.grainSeed\)/);
+  assert.match(staticApp, /await exportProcessor\.process\(source, photo\.edit, photo\.grainSeed\)/);
+  assert.match(staticApp, /processPixels\(source, photo\.edit, photo\.grainSeed\)/);
+  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=42"/);
+  assert.match(exportWorker, /const pixels = processPixels\(source, message\.edit, message\.seed\)/);
 
   const sliderUpdate = staticApp.match(/function updateAdjustmentValue\(value\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
   assert.match(sliderUpdate, /renderAdjustmentControls/);
@@ -360,6 +366,12 @@ test("shows preview diagnostics only for the temporary debug query mode", async 
   assert.match(staticApp, /GPU init failed:/);
   assert.match(staticApp, /Average submit/);
   assert.match(staticApp, /Preview size:/);
+  assert.match(staticApp, /Export processor:/);
+  assert.match(staticApp, /Worker processPixels/);
+  assert.match(staticApp, /Main-thread processPixels/);
+  assert.match(staticApp, /Draw\/getImageData/);
+  assert.match(staticApp, /JPEG encoding/);
+  assert.match(staticApp, /File ready/);
   assert.match(staticApp, /if \(DEBUG_MODE\) recordPreviewTiming\("gpu", performance\.now\(\) - startedAt\)/);
   assert.match(staticApp, /if \(DEBUG_MODE\) recordPreviewTiming\("cpu", performance\.now\(\) - startedAt\)/);
   assert.match(gpuPreview, /onError\?\.\(\{ stage: "probe", error \}\)/);
@@ -370,6 +382,29 @@ test("shows preview diagnostics only for the temporary debug query mode", async 
   assert.doesNotMatch(staticHtml, /data-preview-diagnostics/);
   assert.match(page, /data-preview-diagnostics="true"/);
   assert.match(page, /new URLSearchParams\(window\.location\.search\)\.get\("debug"\) === "1"/);
+});
+
+test("paints Saving feedback before sequential Worker export and preserves share fallbacks", async () => {
+  const [page, staticApp, processor, worker] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../lib/export-processor.js", import.meta.url), "utf8"),
+    readFile(new URL("../lib/export-worker.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(staticApp, /elements\.exportButton\.textContent = state\.busy \? "Saving…" : "Save"/);
+  assert.match(staticApp, /window\.requestAnimationFrame\(\(\) => window\.requestAnimationFrame\(resolve\)\)/);
+  assert.match(staticApp, /if \(!state\.photos\.length \|\| state\.busy\) return/);
+  assert.match(staticApp, /for \(let index = 0; index < state\.photos\.length; index \+= 1\)/);
+  assert.match(staticApp, /navigator\.canShare/);
+  assert.match(staticApp, /See_Photos\.zip/);
+  assert.match(page, /exportInFlightRef\.current/);
+  assert.match(page, /\{busy \? "Saving…" : "Save"\}/);
+  assert.match(page, /await waitForPaint\(\)/);
+  assert.match(processor, /\[source\.data\.buffer\]/);
+  assert.match(processor, /processor: "main-thread"/);
+  assert.match(worker, /\[pixels\.buffer\]/);
+  assert.doesNotMatch(worker, /OffscreenCanvas/);
 });
 
 test("preserves CPU fallback when WebGL2 initialization is forced to fail", async () => {

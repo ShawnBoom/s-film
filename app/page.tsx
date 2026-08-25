@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
+import { createExportProcessor } from "../lib/export-processor.js";
 import { createGpuPreviewRenderer } from "../lib/gpu-preview.js";
 import { hashSeed, processPixels } from "../lib/image-engine.js";
 import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
@@ -68,6 +69,12 @@ function canvasToJpeg(canvas: HTMLCanvasElement, quality = 0.95) {
       "image/jpeg",
       quality,
     );
+  });
+}
+
+function waitForPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
   });
 }
 
@@ -177,6 +184,8 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const sourceDataRef = useRef<ImageData | null>(null);
   const gpuPreviewRef = useRef<ReturnType<typeof createGpuPreviewRenderer>>(null);
+  const exportProcessorRef = useRef<ReturnType<typeof createExportProcessor>>(null);
+  const exportInFlightRef = useRef(false);
   const gpuPreviewAttemptedRef = useRef(false);
   const renderFrameRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
@@ -186,6 +195,17 @@ export default function Home() {
     lastPath: "" as "" | "gpu" | "cpu",
     lastDuration: null as number | null,
     samples: { gpu: [] as number[], cpu: [] as number[] },
+    exportError: "",
+    exportTiming: {
+      photo: "—",
+      decode: null as number | null,
+      drawRead: null as number | null,
+      process: null as number | null,
+      processor: "worker" as "worker" | "main-thread",
+      put: null as number | null,
+      jpeg: null as number | null,
+      total: null as number | null,
+    },
   });
 
   const currentPhoto = photos[activeIndex] ?? null;
@@ -197,6 +217,22 @@ export default function Home() {
 
   useEffect(() => {
     setDebugMode(new URLSearchParams(window.location.search).get("debug") === "1");
+  }, []);
+
+  useEffect(() => {
+    const processor = createExportProcessor({
+      onFailure(error: unknown) {
+        diagnosticsRef.current.exportError = error instanceof Error
+          ? error.message
+          : String(error);
+        setDebugVersion((version) => version + 1);
+      },
+    });
+    exportProcessorRef.current = processor;
+    return () => {
+      processor.destroy();
+      exportProcessorRef.current = null;
+    };
   }, []);
 
   const adjustmentConfig = useMemo(() => {
@@ -458,38 +494,113 @@ export default function Home() {
     showToast("当前照片已重置");
   }
 
-  async function processPhoto(photo: PhotoItem) {
+  function updateExportDiagnostics(
+    patch: Partial<typeof diagnosticsRef.current.exportTiming>,
+  ) {
+    if (!debugMode) return;
+    Object.assign(diagnosticsRef.current.exportTiming, patch);
+    setDebugVersion((version) => version + 1);
+  }
+
+  async function processPhoto(photo: PhotoItem, index: number, total: number) {
+    const totalStartedAt = performance.now();
+    const processor = exportProcessorRef.current;
+    updateExportDiagnostics({
+      photo: index + 1 + " / " + total,
+      decode: null,
+      drawRead: null,
+      process: null,
+      processor: processor?.mode ?? "main-thread",
+      put: null,
+      jpeg: null,
+      total: null,
+    });
+
+    const decodeStartedAt = performance.now();
     const image = await loadImage(photo.url);
+    updateExportDiagnostics({ decode: performance.now() - decodeStartedAt });
+
+    const drawStartedAt = performance.now();
     const canvas = document.createElement("canvas");
     canvas.width = image.naturalWidth;
     canvas.height = image.naturalHeight;
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("当前浏览器无法处理照片");
     context.drawImage(image, 0, 0);
-    const source = context.getImageData(0, 0, canvas.width, canvas.height);
-    const pixels = processPixels(source, photo.edit, photo.grainSeed);
+    let source: ImageData | null = context.getImageData(0, 0, canvas.width, canvas.height);
+    let drawReadDuration = performance.now() - drawStartedAt;
+    updateExportDiagnostics({ drawRead: drawReadDuration });
+
+    let processed: {
+      pixels: Uint8ClampedArray;
+      processor: "worker" | "main-thread";
+      duration: number;
+    } | null;
+    try {
+      if (processor) {
+        processed = await processor.process(source, photo.edit, photo.grainSeed);
+      } else {
+        const processStartedAt = performance.now();
+        processed = {
+          pixels: processPixels(source, photo.edit, photo.grainSeed),
+          processor: "main-thread",
+          duration: performance.now() - processStartedAt,
+        };
+      }
+    } catch {
+      const fallbackReadStartedAt = performance.now();
+      source = context.getImageData(0, 0, canvas.width, canvas.height);
+      drawReadDuration += performance.now() - fallbackReadStartedAt;
+      const fallbackStartedAt = performance.now();
+      processed = {
+        pixels: processPixels(source, photo.edit, photo.grainSeed),
+        processor: "main-thread",
+        duration: performance.now() - fallbackStartedAt,
+      };
+    }
+    let pixels: Uint8ClampedArray | null = processed.pixels;
+    const processDuration = processed.duration;
+    const processMode = processed.processor;
+    processed = null;
+    source = null;
+    updateExportDiagnostics({
+      drawRead: drawReadDuration,
+      process: processDuration,
+      processor: processMode,
+    });
+
+    const putStartedAt = performance.now();
     context.putImageData(new ImageData(pixels, canvas.width, canvas.height), 0, 0);
+    pixels = null;
+    updateExportDiagnostics({ put: performance.now() - putStartedAt });
+
+    const jpegStartedAt = performance.now();
     const blob = await canvasToJpeg(canvas, 0.95);
+    updateExportDiagnostics({ jpeg: performance.now() - jpegStartedAt });
     canvas.width = 1;
     canvas.height = 1;
     const base = photo.filename.replace(/\.[^.]+$/, "") || "photo";
-    return new File([blob], base + "_See.jpg", {
+    const file = new File([blob], base + "_See.jpg", {
       type: "image/jpeg",
       lastModified: Date.now(),
     });
+    updateExportDiagnostics({ total: performance.now() - totalStartedAt });
+    return file;
   }
 
   async function exportPhotos() {
-    if (!photos.length || busy) return;
+    if (!photos.length || exportInFlightRef.current) return;
+    exportInFlightRef.current = true;
     setShowOriginal(false);
     setBusy(true);
-    setStatus("正在处理 1 / " + photos.length);
+    setStatus("正在准备保存");
+    await waitForPaint();
 
     try {
       const files: File[] = [];
       for (let index = 0; index < photos.length; index += 1) {
         setStatus("正在处理 " + (index + 1) + " / " + photos.length);
-        files.push(await processPhoto(photos[index]));
+        files.push(await processPhoto(photos[index], index, photos.length));
         await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
 
@@ -512,6 +623,7 @@ export default function Home() {
         setStatus("保存失败，请减少照片数量后重试");
       }
     } finally {
+      exportInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -525,6 +637,12 @@ export default function Home() {
   const diagnosticAverageLabel = diagnosticPath === "gpu" ? "Average submit" : "Average";
   const diagnosticSource = sourceDataRef.current;
   const diagnosticFilterActive = Boolean(currentEdit.filter && currentEdit.strength > 0);
+  const exportProcessorMode = exportProcessorRef.current?.mode ?? "main-thread";
+  const exportTiming = diagnosticsRef.current.exportTiming;
+  const exportDuration = (value: number | null) => value === null ? "—" : value.toFixed(1) + " ms";
+  const exportProcessLabel = exportTiming.processor === "worker"
+    ? "Worker processPixels"
+    : "Main-thread processPixels";
   const diagnosticText = [
     "Preview: " + (diagnosticPath === "gpu" ? "WebGL2 GPU" : "CPU fallback"),
     gpuPreviewRef.current
@@ -543,6 +661,17 @@ export default function Home() {
     "Light: " + currentEdit.brightness,
     "Color: " + currentEdit.color,
     "Grain: " + currentEdit.grain,
+    "Export processor: " + (exportProcessorMode === "worker" ? "Worker" : "Main-thread fallback"),
+    ...(diagnosticsRef.current.exportError
+      ? ["Export Worker failed: " + diagnosticsRef.current.exportError]
+      : []),
+    "Export photo: " + exportTiming.photo,
+    "Decode: " + exportDuration(exportTiming.decode),
+    "Draw/getImageData: " + exportDuration(exportTiming.drawRead),
+    exportProcessLabel + ": " + exportDuration(exportTiming.process),
+    "putImageData: " + exportDuration(exportTiming.put),
+    "JPEG encoding: " + exportDuration(exportTiming.jpeg),
+    "File ready: " + exportDuration(exportTiming.total),
   ].join("\n");
   void debugVersion;
 
@@ -758,9 +887,10 @@ export default function Home() {
             className="bottom-action save-action"
             type="button"
             disabled={!photos.length || busy}
+            aria-busy={busy}
             onClick={() => void exportPhotos()}
           >
-            Save
+            {busy ? "Saving…" : "Save"}
           </button>
         </div>
         <p className="visually-hidden" role="status" aria-live="polite">

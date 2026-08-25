@@ -1,6 +1,7 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=41";
-import { hashSeed, processPixels } from "./image-engine.js?v=41";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=41";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=42";
+import { createExportProcessor } from "./export-processor.js?v=42";
+import { hashSeed, processPixels } from "./image-engine.js?v=42";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=42";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -42,6 +43,17 @@ const diagnostics = {
   lastPath: "",
   lastDuration: null,
   samples: { gpu: [], cpu: [] },
+  exportError: "",
+  exportTiming: {
+    photo: "—",
+    decode: null,
+    drawRead: null,
+    process: null,
+    processor: "worker",
+    put: null,
+    jpeg: null,
+    total: null,
+  },
 };
 
 const gpuPreview = DEBUG_MODE
@@ -53,6 +65,18 @@ const gpuPreview = DEBUG_MODE
   })
   : createGpuPreviewRenderer(elements.canvas);
 const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
+const exportProcessor = createExportProcessor({
+  createWorker: () => new Worker(
+    new URL("./export-worker.js?v=42", import.meta.url),
+    { type: "module" },
+  ),
+  onFailure(error) {
+    diagnostics.exportError = error instanceof Error ? error.message : String(error);
+    queueMicrotask(() => {
+      if (DEBUG_MODE) updateDiagnosticOverlay();
+    });
+  },
+});
 
 function createDiagnosticOverlay() {
   const overlay = document.createElement("aside");
@@ -78,6 +102,14 @@ function updateDiagnosticOverlay() {
     ? state.sourceData.width + " × " + state.sourceData.height
     : "—";
   const filterActive = Boolean(edit.filter && edit.strength > 0);
+  const exportTiming = diagnostics.exportTiming;
+  const exportProcessorLabel = exportProcessor.mode === "worker"
+    ? "Worker"
+    : "Main-thread fallback";
+  const exportProcessLabel = exportTiming.processor === "worker"
+    ? "Worker processPixels"
+    : "Main-thread processPixels";
+  const duration = (value) => value === null ? "—" : value.toFixed(1) + " ms";
 
   diagnosticOverlay.textContent = [
     "Preview: " + (path === "gpu" ? "WebGL2 GPU" : "CPU fallback"),
@@ -91,7 +123,22 @@ function updateDiagnosticOverlay() {
     "Light: " + edit.brightness,
     "Color: " + edit.color,
     "Grain: " + edit.grain,
+    "Export processor: " + exportProcessorLabel,
+    ...(diagnostics.exportError ? ["Export Worker failed: " + diagnostics.exportError] : []),
+    "Export photo: " + exportTiming.photo,
+    "Decode: " + duration(exportTiming.decode),
+    "Draw/getImageData: " + duration(exportTiming.drawRead),
+    exportProcessLabel + ": " + duration(exportTiming.process),
+    "putImageData: " + duration(exportTiming.put),
+    "JPEG encoding: " + duration(exportTiming.jpeg),
+    "File ready: " + duration(exportTiming.total),
   ].join("\n");
+}
+
+function updateExportDiagnostics(patch) {
+  if (!DEBUG_MODE) return;
+  Object.assign(diagnostics.exportTiming, patch);
+  updateDiagnosticOverlay();
 }
 
 function recordPreviewTiming(path, duration) {
@@ -252,6 +299,8 @@ function renderControls() {
   elements.photoCount.hidden = !photo;
   elements.photoCount.textContent = photo ? state.activeIndex + 1 + " / " + state.photos.length : "";
   elements.exportButton.disabled = !photo || state.busy;
+  elements.exportButton.textContent = state.busy ? "Saving…" : "Save";
+  elements.exportButton.setAttribute("aria-busy", String(state.busy));
   elements.applyAll.disabled = state.photos.length < 2;
   elements.resetCurrent.disabled = !photo;
   elements.filters.forEach((button) => {
@@ -426,25 +475,82 @@ function canvasToJpeg(canvas, quality = 0.95) {
   });
 }
 
-async function processPhoto(photo) {
+function waitForPaint() {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(resolve));
+  });
+}
+
+async function processPhoto(photo, index, total) {
+  const totalStartedAt = performance.now();
+  updateExportDiagnostics({
+    photo: index + 1 + " / " + total,
+    decode: null,
+    drawRead: null,
+    process: null,
+    processor: exportProcessor.mode,
+    put: null,
+    jpeg: null,
+    total: null,
+  });
+
+  const decodeStartedAt = performance.now();
   const image = await loadImage(photo.url);
+  updateExportDiagnostics({ decode: performance.now() - decodeStartedAt });
+
+  const drawStartedAt = performance.now();
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("当前浏览器无法处理照片");
   context.drawImage(image, 0, 0);
-  const source = context.getImageData(0, 0, canvas.width, canvas.height);
-  const pixels = processPixels(source, photo.edit, photo.grainSeed);
+  let source = context.getImageData(0, 0, canvas.width, canvas.height);
+  let drawReadDuration = performance.now() - drawStartedAt;
+  updateExportDiagnostics({ drawRead: drawReadDuration });
+
+  let processed;
+  try {
+    processed = await exportProcessor.process(source, photo.edit, photo.grainSeed);
+  } catch {
+    const fallbackReadStartedAt = performance.now();
+    source = context.getImageData(0, 0, canvas.width, canvas.height);
+    drawReadDuration += performance.now() - fallbackReadStartedAt;
+    const fallbackStartedAt = performance.now();
+    processed = {
+      pixels: processPixels(source, photo.edit, photo.grainSeed),
+      processor: "main-thread",
+      duration: performance.now() - fallbackStartedAt,
+    };
+  }
+  let pixels = processed.pixels;
+  const processDuration = processed.duration;
+  const processMode = processed.processor;
+  processed = null;
+  source = null;
+  updateExportDiagnostics({
+    drawRead: drawReadDuration,
+    process: processDuration,
+    processor: processMode,
+  });
+
+  const putStartedAt = performance.now();
   context.putImageData(new ImageData(pixels, canvas.width, canvas.height), 0, 0);
+  pixels = null;
+  updateExportDiagnostics({ put: performance.now() - putStartedAt });
+
+  const jpegStartedAt = performance.now();
   const blob = await canvasToJpeg(canvas, 0.95);
+  updateExportDiagnostics({ jpeg: performance.now() - jpegStartedAt });
   canvas.width = 1;
   canvas.height = 1;
   const base = photo.filename.replace(/\.[^.]+$/, "") || "photo";
-  return new File([blob], base + "_See.jpg", {
+  const file = new File([blob], base + "_See.jpg", {
     type: "image/jpeg",
     lastModified: Date.now(),
   });
+  updateExportDiagnostics({ total: performance.now() - totalStartedAt });
+  return file;
 }
 
 function zipNumber(view, offset, value, bytes) {
@@ -528,12 +634,14 @@ async function exportPhotos() {
   setShowOriginal(false);
   state.busy = true;
   renderControls();
+  setStatus("正在准备保存");
+  await waitForPaint();
 
   try {
     const files = [];
     for (let index = 0; index < state.photos.length; index += 1) {
       setStatus("正在处理 " + (index + 1) + " / " + state.photos.length);
-      files.push(await processPhoto(state.photos[index]));
+      files.push(await processPhoto(state.photos[index], index, state.photos.length));
       await new Promise((resolve) => window.setTimeout(resolve, 0));
     }
 
@@ -618,6 +726,8 @@ document.querySelector(".interaction-surface").addEventListener("dragstart", (ev
   if (event.target.closest("img")) event.preventDefault();
 });
 
+window.addEventListener("pagehide", () => exportProcessor.destroy(), { once: true });
+
 window.addEventListener("beforeunload", () => {
   state.photos.forEach((photo) => URL.revokeObjectURL(photo.url));
   gpuPreview?.destroy();
@@ -625,7 +735,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=41", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=42", { scope: "./" }).catch(() => {});
   });
 }
 
