@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createExportProcessor } from "../lib/export-processor.js";
 import { processPixels } from "../lib/image-engine.js";
+import { loadFilterLut } from "../lib/lut-loader.js";
 
 const FILTERS = [
   "classic",
@@ -20,6 +21,8 @@ const FILTERS = [
   "slot11",
   "slot14",
 ];
+
+await Promise.all(FILTERS.map((filter) => loadFilterLut(filter)));
 
 class FakeWorker {
   constructor({ failProcess = false } = {}) {
@@ -90,7 +93,15 @@ function sourcePixels() {
 }
 
 test("Worker export matches the shared CPU engine for all 14 LUT mappings", async () => {
-  const processor = createExportProcessor({ createWorker: () => new FakeWorker() });
+  let workerCreations = 0;
+  const processor = createExportProcessor({
+    createWorker: () => {
+      workerCreations += 1;
+      return new FakeWorker();
+    },
+  });
+  assert.equal(processor.mode, "idle");
+  assert.equal(workerCreations, 0, "constructing the processor must not create a Worker");
 
   for (const filter of FILTERS) {
     const edit = { filter, strength: 73, brightness: 18, color: -21, grain: 26 };
@@ -101,6 +112,8 @@ test("Worker export matches the shared CPU engine for all 14 LUT mappings", asyn
     assert.deepEqual(result.pixels, expected, filter);
     assert.equal(source.data.byteLength, 0, "input RGBA buffer should be transferred");
   }
+
+  assert.equal(workerCreations, 1, "one lazily-created Worker is reused");
 
   processor.destroy();
 });

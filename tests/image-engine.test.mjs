@@ -8,6 +8,12 @@ import {
   getLightParameters,
   processPixels,
 } from "../lib/image-engine.js";
+import { loadFilterLut } from "../lib/lut-loader.js";
+
+await Promise.all([
+  "classic", "gold", "youth", "slot04", "slot05", "slot06", "slot07",
+  "slot08", "slot09", "slot10", "slot11", "slot12", "slot13", "slot14",
+].map((filter) => loadFilterLut(filter)));
 
 const source = {
   width: 3,

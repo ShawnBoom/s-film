@@ -60,6 +60,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(()=>{if(new URLSearchParams(location.search).get("debug")!=="1")return;const origin=performance.now(),probe={origin,events:[{label:"HTML boot",time:origin,detail:""}]};window.__SEE_BOOT__=probe;const first=event=>{const target=event.target,name=target?.id||target?.getAttribute?.("aria-label")||target?.className||target?.tagName||"unknown";probe.events.push({label:"first pointerdown",time:performance.now(),detail:String(name)+" — appReady="+(document.documentElement.dataset.appReady==="true")});document.removeEventListener("pointerdown",first,true)};document.addEventListener("pointerdown",first,true)})();`,
+          }}
+        />
+      </head>
       <body>
         {children}
         <PwaRegister />

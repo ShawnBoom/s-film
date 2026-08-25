@@ -9,6 +9,7 @@ import { createExportProcessor } from "../lib/export-processor.js";
 import { attemptGpuFullResolutionExport } from "../lib/gpu-export.js";
 import { createGpuPreviewRenderer } from "../lib/gpu-preview.js";
 import { hashSeed, processPixels } from "../lib/image-engine.js";
+import { loadFilterLut } from "../lib/lut-loader.js";
 import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
 
 const FILTERS = [
@@ -98,6 +99,16 @@ function rangeStyle(value: number, min: number, max: number): CSSProperties {
 function clampAdjustment(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
+
+function markStartup(label: string, detail = "") {
+  if (typeof window === "undefined") return;
+  const probe = (window as typeof window & {
+    __SEE_BOOT__?: { events: Array<{ label: string; time: number; detail: string }> };
+  }).__SEE_BOOT__;
+  probe?.events.push({ label, time: performance.now(), detail });
+}
+
+markStartup("module entry");
 
 function zipNumber(view: DataView, offset: number, value: number, bytes: number) {
   if (bytes === 2) view.setUint16(offset, value, true);
@@ -189,8 +200,12 @@ export default function Home() {
   const [status, setStatus] = useState("等待添加照片");
   const [toast, setToast] = useState("");
   const [adjustmentDraft, setAdjustmentDraft] = useState("0");
-  const [debugMode, setDebugMode] = useState(false);
+  const [debugMode] = useState(() => (
+    typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("debug") === "1"
+  ));
   const [debugVersion, setDebugVersion] = useState(0);
+  const [loadingFilters, setLoadingFilters] = useState<Set<FilterId>>(() => new Set());
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -198,6 +213,8 @@ export default function Home() {
   const gpuPreviewRef = useRef<ReturnType<typeof createGpuPreviewRenderer>>(null);
   const exportProcessorRef = useRef<ReturnType<typeof createExportProcessor>>(null);
   const exportInFlightRef = useRef(false);
+  const filterSelectionTokenRef = useRef(0);
+  const firstLutRequestedRef = useRef(false);
   const gpuPreviewAttemptedRef = useRef(false);
   const renderFrameRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
@@ -208,6 +225,7 @@ export default function Home() {
     lastDuration: null as number | null,
     samples: { gpu: [] as number[], cpu: [] as number[] },
     exportError: "",
+    lutError: "",
     exportTiming: {
       photo: "—",
       decode: null as number | null,
@@ -229,21 +247,31 @@ export default function Home() {
   const sourceUrl = currentPhoto?.url ?? "";
 
   useEffect(() => {
-    setDebugMode(new URLSearchParams(window.location.search).get("debug") === "1");
+    markStartup("listeners ready");
+    document.documentElement.dataset.appReady = "true";
+    markStartup("+ functional");
+    markStartup("app ready");
   }, []);
 
   useEffect(() => {
-    const processor = createExportProcessor({
-      onFailure(error: unknown) {
-        diagnosticsRef.current.exportError = error instanceof Error
-          ? error.message
-          : String(error);
-        setDebugVersion((version) => version + 1);
-      },
-    });
-    exportProcessorRef.current = processor;
+    const handlePageHide = (event: PageTransitionEvent) => {
+      markStartup("pagehide", event.persisted ? "persisted" : "not persisted");
+      exportProcessorRef.current?.destroy();
+      exportProcessorRef.current = null;
+    };
+    const handlePageShow = (event: PageTransitionEvent) => {
+      markStartup("pageshow", event.persisted ? "persisted" : "not persisted");
+      document.documentElement.dataset.appReady = "true";
+    };
+    const handleVisibility = () => markStartup("visibilitychange", document.visibilityState);
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
-      processor.destroy();
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      exportProcessorRef.current?.destroy();
       exportProcessorRef.current = null;
     };
   }, []);
@@ -328,6 +356,7 @@ export default function Home() {
 
         if (!gpuPreviewAttemptedRef.current) {
           gpuPreviewAttemptedRef.current = true;
+          markStartup("GPU init start");
           gpuPreviewRef.current = debugMode
             ? createGpuPreviewRenderer(canvas, {
               onError({ stage, error }: { stage: string; error: unknown }) {
@@ -337,6 +366,10 @@ export default function Home() {
               },
             })
             : createGpuPreviewRenderer(canvas);
+          markStartup(
+            "GPU init end",
+            gpuPreviewRef.current ? "WebGL2 GPU" : "CPU fallback",
+          );
         }
         if (gpuPreviewRef.current) {
           gpuPreviewRef.current.setSource(sourceData);
@@ -366,7 +399,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [currentPhotoId, sourceUrl]);
+  }, [currentPhotoId, sourceUrl, debugMode]);
 
   useEffect(() => {
     if (renderFrameRef.current) cancelAnimationFrame(renderFrameRef.current);
@@ -416,6 +449,23 @@ export default function Home() {
     toastTimerRef.current = window.setTimeout(() => setToast(""), 1800);
   }
 
+  function ensureExportProcessor() {
+    if (exportProcessorRef.current) return exportProcessorRef.current;
+    exportProcessorRef.current = createExportProcessor({
+      onWorkerCreated() {
+        markStartup("Worker created");
+        setDebugVersion((version) => version + 1);
+      },
+      onFailure(error: unknown) {
+        diagnosticsRef.current.exportError = error instanceof Error
+          ? error.message
+          : String(error);
+        setDebugVersion((version) => version + 1);
+      },
+    });
+    return exportProcessorRef.current;
+  }
+
   function updateCurrentEdit(patch: Partial<EditState>) {
     if (!currentPhoto) return;
     setShowOriginal(false);
@@ -424,6 +474,42 @@ export default function Home() {
         index === activeIndex ? { ...item, edit: { ...item.edit, ...patch } } : item,
       ),
     );
+  }
+
+  async function selectFilter(filter: FilterId) {
+    if (!currentPhoto) return;
+    const photoId = currentPhoto.id;
+    const token = ++filterSelectionTokenRef.current;
+    const firstRequest = !firstLutRequestedRef.current;
+    if (firstRequest) {
+      firstLutRequestedRef.current = true;
+      markStartup("first LUT requested", filter);
+    }
+    setLoadingFilters((current) => new Set(current).add(filter));
+    diagnosticsRef.current.lutError = "";
+
+    try {
+      await loadFilterLut(filter);
+      if (firstRequest) markStartup("first LUT loaded", filter);
+      if (token !== filterSelectionTokenRef.current) return;
+      setShowOriginal(false);
+      setPhotos((items) => items.map((item) => (
+        item.id === photoId ? { ...item, edit: { ...item.edit, filter } } : item
+      )));
+    } catch (error) {
+      diagnosticsRef.current.lutError = `${filter}: ${error instanceof Error ? error.message : String(error)}`;
+      if (token === filterSelectionTokenRef.current) {
+        setStatus("滤镜载入失败，请重试");
+        showToast("滤镜载入失败，请重试");
+      }
+    } finally {
+      setLoadingFilters((current) => {
+        const next = new Set(current);
+        next.delete(filter);
+        return next;
+      });
+      if (debugMode) setDebugVersion((version) => version + 1);
+    }
   }
 
   function updateAdjustmentValue(value: number) {
@@ -517,7 +603,7 @@ export default function Home() {
 
   async function processPhoto(photo: PhotoItem, index: number, total: number) {
     const totalStartedAt = performance.now();
-    const processor = exportProcessorRef.current;
+    await loadFilterLut(photo.edit.filter);
     updateExportDiagnostics({
       photo: index + 1 + " / " + total,
       decode: null,
@@ -561,20 +647,15 @@ export default function Home() {
     } else {
       gpuFallback = gpuAttempt.reason;
       try {
-        if (processor) {
-          const cpuResult = await processor.process(source, photo.edit, photo.grainSeed);
-          processed = cpuResult;
-          processMode = cpuResult.processor === "worker"
-            ? "worker-fallback"
-            : "main-thread-fallback";
-        } else {
-          const processStartedAt = performance.now();
-          processed = {
-            pixels: processPixels(source, photo.edit, photo.grainSeed),
-            duration: performance.now() - processStartedAt,
-          };
-          processMode = "main-thread-fallback";
-        }
+        const cpuResult = await ensureExportProcessor().process(
+          source,
+          photo.edit,
+          photo.grainSeed,
+        );
+        processed = cpuResult;
+        processMode = cpuResult.processor === "worker"
+          ? "worker-fallback"
+          : "main-thread-fallback";
       } catch {
         const fallbackReadStartedAt = performance.now();
         source = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -681,8 +762,26 @@ export default function Home() {
     : exportTiming.processor === "worker-fallback"
       ? "Worker processPixels"
       : "Main-thread processPixels";
+  const bootProbe = typeof window === "undefined" ? null : (window as typeof window & {
+    __SEE_BOOT__?: {
+      origin: number;
+      events: Array<{ label: string; time: number; detail: string }>;
+    };
+  }).__SEE_BOOT__;
+  const startupLines = (bootProbe?.events ?? []).map((event) => (
+    `${event.label}: ${Math.max(0, event.time - bootProbe!.origin).toFixed(1)} ms`
+      + (event.detail ? " — " + event.detail : "")
+  ));
   const diagnosticText = [
-    "Preview: " + (diagnosticPath === "gpu" ? "WebGL2 GPU" : "CPU fallback"),
+    "Startup",
+    ...startupLines,
+    "appReady: " + (typeof document !== "undefined" && document.documentElement.dataset.appReady === "true"),
+    "",
+    "Preview: " + (gpuPreviewRef.current
+      ? "WebGL2 GPU"
+      : gpuPreviewAttemptedRef.current
+        ? "CPU fallback"
+        : "Not initialized"),
     gpuPreviewRef.current
       ? "GPU init: OK"
       : "GPU init failed: " + (diagnosticsRef.current.initError || "Not initialized"),
@@ -709,6 +808,9 @@ export default function Home() {
       : []),
     ...(diagnosticsRef.current.exportError
       ? ["Export Worker failed: " + diagnosticsRef.current.exportError]
+      : []),
+    ...(diagnosticsRef.current.lutError
+      ? ["LUT load failed: " + diagnosticsRef.current.lutError]
       : []),
     "Export photo: " + exportTiming.photo,
     "Decode: " + exportDuration(exportTiming.decode),
@@ -821,8 +923,9 @@ export default function Home() {
               key={filter.id}
               aria-label={filter.name ? filter.label + " " + filter.name : filter.label}
               aria-pressed={currentEdit.filter === filter.id}
-              disabled={!currentPhoto}
-              onClick={() => updateCurrentEdit({ filter: filter.id })}
+              aria-busy={loadingFilters.has(filter.id)}
+              disabled={!currentPhoto || loadingFilters.has(filter.id)}
+              onClick={() => void selectFilter(filter.id)}
             >
               <span className="filter-label">
                 {filter.label.split(" ").map((line) => (

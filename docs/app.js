@@ -1,12 +1,21 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=48";
-import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=48";
-import { createExportProcessor } from "./export-processor.js?v=48";
-import { hashSeed, processPixels } from "./image-engine.js?v=48";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=48";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=50";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=50";
+import { createExportProcessor } from "./export-processor.js?v=50";
+import { hashSeed, processPixels } from "./image-engine.js?v=50";
+import { loadFilterLut } from "./lut-loader.js?v=50";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=50";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
 const DEBUG_MODE = new URLSearchParams(window.location.search).get("debug") === "1";
+const bootProbe = DEBUG_MODE ? window.__SEE_BOOT__ : null;
+
+function markStartup(label, detail = "") {
+  if (!bootProbe) return;
+  bootProbe.events.push({ label, time: performance.now(), detail });
+}
+
+markStartup("module entry");
 
 const state = {
   photos: [],
@@ -18,6 +27,8 @@ const state = {
   renderFrame: 0,
   loadToken: 0,
   toastTimer: 0,
+  filterSelectionToken: 0,
+  loadingFilters: new Set(),
 };
 
 const elements = {
@@ -45,6 +56,7 @@ const diagnostics = {
   lastDuration: null,
   samples: { gpu: [], cpu: [] },
   exportError: "",
+  lutError: "",
   exportTiming: {
     photo: "—",
     decode: null,
@@ -58,27 +70,53 @@ const diagnostics = {
   },
 };
 
-const gpuPreview = DEBUG_MODE
-  ? createGpuPreviewRenderer(elements.canvas, {
-    onError({ stage, error }) {
-      const message = (error instanceof Error ? error.message : String(error)).replace(/\0/g, "");
-      diagnostics.initError = stage + ": " + message;
-    },
-  })
-  : createGpuPreviewRenderer(elements.canvas);
+let gpuPreview = null;
+let gpuPreviewAttempted = false;
+let exportProcessor = null;
 const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
-const exportProcessor = createExportProcessor({
-  createWorker: () => new Worker(
-    new URL("./export-worker.js?v=48", import.meta.url),
-    { type: "module" },
-  ),
-  onFailure(error) {
-    diagnostics.exportError = error instanceof Error ? error.message : String(error);
-    queueMicrotask(() => {
+
+function ensureGpuPreview() {
+  if (gpuPreviewAttempted) return gpuPreview;
+  gpuPreviewAttempted = true;
+  markStartup("GPU init start");
+  gpuPreview = DEBUG_MODE
+    ? createGpuPreviewRenderer(elements.canvas, {
+      onError({ stage, error }) {
+        const message = (error instanceof Error ? error.message : String(error)).replace(/\0/g, "");
+        diagnostics.initError = stage + ": " + message;
+      },
+    })
+    : createGpuPreviewRenderer(elements.canvas);
+  markStartup("GPU init end", gpuPreview ? "WebGL2 GPU" : "CPU fallback");
+  if (DEBUG_MODE) updateDiagnosticOverlay();
+  return gpuPreview;
+}
+
+function ensureExportProcessor() {
+  if (exportProcessor) return exportProcessor;
+  exportProcessor = createExportProcessor({
+    createWorker: () => new Worker(
+      new URL("./export-worker.js?v=50", import.meta.url),
+      { type: "module" },
+    ),
+    onWorkerCreated() {
+      markStartup("Worker created");
       if (DEBUG_MODE) updateDiagnosticOverlay();
-    });
-  },
-});
+    },
+    onFailure(error) {
+      diagnostics.exportError = error instanceof Error ? error.message : String(error);
+      queueMicrotask(() => {
+        if (DEBUG_MODE) updateDiagnosticOverlay();
+      });
+    },
+  });
+  return exportProcessor;
+}
+
+function destroyExportProcessor() {
+  exportProcessor?.destroy();
+  exportProcessor = null;
+}
 
 function createDiagnosticOverlay() {
   const overlay = document.createElement("aside");
@@ -96,6 +134,11 @@ function updateDiagnosticOverlay() {
   const photo = currentPhoto();
   const edit = photo?.edit ?? createNeutralEdit();
   const path = gpuPreview ? "gpu" : "cpu";
+  const previewLabel = gpuPreview
+    ? "WebGL2 GPU"
+    : gpuPreviewAttempted
+      ? "CPU fallback"
+      : "Not initialized";
   const samples = diagnostics.samples[path];
   const average = samples.length
     ? samples.reduce((sum, duration) => sum + duration, 0) / samples.length
@@ -120,10 +163,23 @@ function updateDiagnosticOverlay() {
       ? "Worker processPixels"
       : "Main-thread processPixels";
   const duration = (value) => value === null ? "—" : value.toFixed(1) + " ms";
+  const bootOrigin = bootProbe?.origin ?? 0;
+  const bootLines = (bootProbe?.events ?? []).map((event) => {
+    const elapsed = Math.max(0, event.time - bootOrigin).toFixed(1);
+    return `${event.label}: ${elapsed} ms${event.detail ? " — " + event.detail : ""}`;
+  });
 
   diagnosticOverlay.output.textContent = [
-    "Preview: " + (path === "gpu" ? "WebGL2 GPU" : "CPU fallback"),
-    gpuPreview ? "GPU init: OK" : "GPU init failed: " + (diagnostics.initError || "Unknown error"),
+    "Startup",
+    ...bootLines,
+    "appReady: " + (document.documentElement.dataset.appReady === "true" ? "true" : "false"),
+    "",
+    "Preview: " + previewLabel,
+    gpuPreview
+      ? "GPU init: OK"
+      : gpuPreviewAttempted
+        ? "GPU init failed: " + (diagnostics.initError || "Unknown error")
+        : "GPU init: Not started",
     timingLabel + ": " + (diagnostics.lastPath === path && diagnostics.lastDuration !== null
       ? diagnostics.lastDuration.toFixed(1) + " ms"
       : "—"),
@@ -139,6 +195,7 @@ function updateDiagnosticOverlay() {
     "grainSeed: " + (photo ? photo.grainSeed : "—"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback ? ["GPU fallback: " + exportTiming.gpuFallback] : []),
+    ...(diagnostics.lutError ? ["LUT load failed: " + diagnostics.lutError] : []),
     ...(diagnostics.exportError ? ["Export Worker failed: " + diagnostics.exportError] : []),
     "Export photo: " + exportTiming.photo,
     "Decode: " + duration(exportTiming.decode),
@@ -250,6 +307,35 @@ function updateCurrentEdit(patch) {
   queuePreview();
 }
 
+async function selectFilter(filter) {
+  const photo = currentPhoto();
+  if (!photo || !filter) return;
+  const photoId = photo.id;
+  const token = ++state.filterSelectionToken;
+  const firstRequest = !bootProbe?.events.some((event) => event.label === "first LUT requested");
+  if (firstRequest) markStartup("first LUT requested", filter);
+  state.loadingFilters.add(filter);
+  diagnostics.lutError = "";
+  renderControls();
+
+  try {
+    await loadFilterLut(filter);
+    if (firstRequest) markStartup("first LUT loaded", filter);
+    if (token !== state.filterSelectionToken || currentPhoto()?.id !== photoId) return;
+    updateCurrentEdit({ filter });
+  } catch (error) {
+    diagnostics.lutError = `${filter}: ${error instanceof Error ? error.message : String(error)}`;
+    if (token === state.filterSelectionToken && currentPhoto()?.id === photoId) {
+      setStatus("滤镜载入失败，请重试");
+      showToast("滤镜载入失败，请重试");
+    }
+  } finally {
+    state.loadingFilters.delete(filter);
+    renderControls();
+    if (DEBUG_MODE) updateDiagnosticOverlay();
+  }
+}
+
 function updateAdjustmentValue(value) {
   const photo = currentPhoto();
   if (!photo) return;
@@ -331,7 +417,9 @@ function renderControls() {
   elements.resetCurrent.disabled = !photo;
   elements.filters.forEach((button) => {
     const active = edit.filter === button.dataset.filter;
-    button.disabled = !photo;
+    const loading = state.loadingFilters.has(button.dataset.filter);
+    button.disabled = !photo || loading;
+    button.setAttribute("aria-busy", String(loading));
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   });
@@ -365,6 +453,7 @@ async function prepareSource() {
     context.clearRect(0, 0, width, height);
     context.drawImage(image, 0, 0, width, height);
     state.sourceData = context.getImageData(0, 0, width, height);
+    ensureGpuPreview();
     if (gpuPreview) {
       gpuPreview.setSource(state.sourceData);
     } else {
@@ -509,6 +598,7 @@ function waitForPaint() {
 
 async function processPhoto(photo, index, total) {
   const totalStartedAt = performance.now();
+  await loadFilterLut(photo.edit.filter);
   updateExportDiagnostics({
     photo: index + 1 + " / " + total,
     decode: null,
@@ -551,7 +641,7 @@ async function processPhoto(photo, index, total) {
   } else {
     gpuFallback = gpuAttempt.reason;
     try {
-      const cpuResult = await exportProcessor.process(source, photo.edit, photo.grainSeed);
+      const cpuResult = await ensureExportProcessor().process(source, photo.edit, photo.grainSeed);
       processed = cpuResult;
       processMode = cpuResult.processor === "worker"
         ? "worker-fallback"
@@ -715,6 +805,7 @@ elements.input.addEventListener("change", (event) => {
   handleFiles(event.target.files);
   event.target.value = "";
 });
+document.querySelector("#add-photo")?.addEventListener("click", () => elements.input.click());
 elements.compareButton.addEventListener("click", () => setShowOriginal(!state.showOriginal));
 elements.deleteButton.addEventListener("click", deleteCurrent);
 elements.applyAll.addEventListener("click", applyToAll);
@@ -722,7 +813,7 @@ elements.resetCurrent.addEventListener("click", resetCurrent);
 elements.exportButton.addEventListener("click", exportPhotos);
 
 elements.filters.forEach((button) => {
-  button.addEventListener("click", () => updateCurrentEdit({ filter: button.dataset.filter }));
+  button.addEventListener("click", () => void selectFilter(button.dataset.filter));
 });
 
 elements.adjustmentTabs.forEach((button) => {
@@ -772,17 +863,39 @@ document.querySelector(".interaction-surface").addEventListener("dragstart", (ev
   if (event.target.closest("img")) event.preventDefault();
 });
 
-window.addEventListener("pagehide", () => exportProcessor.destroy(), { once: true });
+markStartup("listeners ready");
+
+window.addEventListener("pagehide", (event) => {
+  markStartup("pagehide", event.persisted ? "persisted" : "not persisted");
+  destroyExportProcessor();
+});
+
+window.addEventListener("pageshow", (event) => {
+  markStartup("pageshow", event.persisted ? "persisted" : "not persisted");
+  if (DEBUG_MODE) updateDiagnosticOverlay();
+});
+
+document.addEventListener("visibilitychange", () => {
+  markStartup("visibilitychange", document.visibilityState);
+  if (DEBUG_MODE) updateDiagnosticOverlay();
+});
 
 window.addEventListener("beforeunload", () => {
   state.photos.forEach((photo) => URL.revokeObjectURL(photo.url));
   gpuPreview?.destroy();
+  destroyExportProcessor();
 });
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=48", { scope: "./" }).catch(() => {});
+    markStartup("window load");
+    navigator.serviceWorker.register("./sw.js?v=50", { scope: "./" }).catch(() => {});
+    if (DEBUG_MODE) updateDiagnosticOverlay();
   });
 }
 
 renderControls();
+markStartup("+ functional");
+document.documentElement.dataset.appReady = "true";
+markStartup("app ready");
+if (DEBUG_MODE) updateDiagnosticOverlay();
