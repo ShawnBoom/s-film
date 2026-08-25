@@ -1,5 +1,5 @@
-import { processPixels } from "./image-engine.js?v=50";
-import { loadFilterLut } from "./lut-loader.js?v=50";
+import { processPixels } from "./image-engine.js?v=51";
+import { loadFilterLut } from "./lut-loader.js?v=51";
 
 self.postMessage({ type: "ready" });
 
