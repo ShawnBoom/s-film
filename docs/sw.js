@@ -1,34 +1,23 @@
 "use strict";
 
-const CACHE_NAME = "see-static-v48";
+const CORE_CACHE = "see-core-v50";
+const LUT_CACHE = "see-luts-v50";
+const LEGACY_LUT_CACHE = "see-static-v48";
 const ROOT = new URL("./", self.registration.scope).href;
-const APP_SHELL = [
+const CORE_APP_SHELL = [
   ROOT,
   new URL("./index.html", ROOT).href,
-  new URL("./styles.css?v=48", ROOT).href,
-  new URL("./app.js?v=48", ROOT).href,
-  new URL("./gpu-preview.js?v=48", ROOT).href,
-  new URL("./gpu-export.js?v=48", ROOT).href,
-  new URL("./export-processor.js?v=48", ROOT).href,
-  new URL("./export-worker.js?v=48", ROOT).href,
-  new URL("./edit-state.js?v=48", ROOT).href,
-  new URL("./image-engine.js?v=48", ROOT).href,
-  new URL("./s01-classic-neg-lut.js?v=48", ROOT).href,
-  new URL("./s02-classic-chrome-lut.js?v=48", ROOT).href,
-  new URL("./s03-classic-chrome-lut.js?v=48", ROOT).href,
-  new URL("./s04-pro400h-lut.js?v=48", ROOT).href,
-  new URL("./s05-superia400-lut.js?v=48", ROOT).href,
-  new URL("./s06-color100-lut.js?v=48", ROOT).href,
-  new URL("./s07-color800z-lut.js?v=48", ROOT).href,
-  new URL("./s08-gold-blue-lut.js?v=48", ROOT).href,
-  new URL("./s09-portra-cool-lut.js?v=48", ROOT).href,
-  new URL("./s10-proimage-original-lut.js?v=48", ROOT).href,
-  new URL("./s11-ektar100-lut.js?v=48", ROOT).href,
-  new URL("./s12-portra400-lut.js?v=48", ROOT).href,
-  new URL("./s13-gold200-lut.js?v=48", ROOT).href,
-  new URL("./s14-chrome64-lut.js?v=48", ROOT).href,
-  new URL("./manifest.webmanifest?v=48", ROOT).href,
-  new URL("./apple-touch-icon.png?v=48", ROOT).href,
+  new URL("./styles.css?v=50", ROOT).href,
+  new URL("./app.js?v=50", ROOT).href,
+  new URL("./gpu-preview.js?v=50", ROOT).href,
+  new URL("./gpu-export.js?v=50", ROOT).href,
+  new URL("./export-processor.js?v=50", ROOT).href,
+  new URL("./export-worker.js?v=50", ROOT).href,
+  new URL("./edit-state.js?v=50", ROOT).href,
+  new URL("./image-engine.js?v=50", ROOT).href,
+  new URL("./lut-loader.js?v=50", ROOT).href,
+  new URL("./manifest.webmanifest?v=50", ROOT).href,
+  new URL("./apple-touch-icon.png?v=50", ROOT).href,
   new URL("./icons/see-apple-touch-icon-120.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-152.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-167.png", ROOT).href,
@@ -42,18 +31,44 @@ const APP_SHELL = [
   new URL("./og.png", ROOT).href,
 ];
 
+function isLutRequest(url) {
+  return /\/s(?:0[1-9]|1[0-4])-[^/]+-lut\.js$/.test(url.pathname);
+}
+
+function canonicalLutRequest(request) {
+  const url = new URL(request.url);
+  url.searchParams.delete("retry");
+  return new Request(url.href, request);
+}
+
+async function fetchAndCache(request, cacheName, cacheKey = request) {
+  const response = await fetch(request);
+  if (response.ok) {
+    const cache = await caches.open(cacheName);
+    await cache.put(cacheKey, response.clone());
+  }
+  return response;
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+  event.waitUntil(Promise.all([
+    caches.open(CORE_CACHE).then((cache) => cache.addAll(CORE_APP_SHELL)),
+    self.skipWaiting(),
+  ]));
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)),
-    )),
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys
+      .filter((key) => (
+        key !== CORE_CACHE
+        && key !== LUT_CACHE
+        && key !== LEGACY_LUT_CACHE
+      ))
+      .map((key) => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
@@ -62,17 +77,41 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match(ROOT)));
+    const coreCachePromise = caches.open(CORE_CACHE);
+    const networkUpdate = coreCachePromise.then((cache) => fetch(request).then((response) => {
+      if (response.ok) return cache.put(ROOT, response.clone()).then(() => response);
+      return response;
+    }));
+    event.waitUntil(networkUpdate.then(() => undefined).catch(() => undefined));
+    event.respondWith(coreCachePromise.then(async (cache) => (
+      await cache.match(ROOT)
+      || networkUpdate
+    )).catch(() => fetch(request)));
+    return;
+  }
+
+  if (isLutRequest(url)) {
+    event.respondWith((async () => {
+      const lutCache = await caches.open(LUT_CACHE);
+      const cacheKey = canonicalLutRequest(request);
+      const cached = await lutCache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        return await fetchAndCache(request, LUT_CACHE, cacheKey);
+      } catch (error) {
+        const legacyCache = await caches.open(LEGACY_LUT_CACHE);
+        const legacy = await legacyCache.match(cacheKey, { ignoreSearch: true });
+        if (legacy) return legacy;
+        throw error;
+      }
+    })());
     return;
   }
 
   if (["script", "style", "image", "font", "manifest"].includes(request.destination)) {
-    event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        return response;
-      })),
-    );
+    event.respondWith(caches.open(CORE_CACHE).then(async (cache) => (
+      await cache.match(request)
+      || fetchAndCache(request, CORE_CACHE)
+    )));
   }
 });

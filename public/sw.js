@@ -1,4 +1,5 @@
-const CACHE_NAME = "see-v27";
+const CORE_CACHE = "see-core-v50";
+const RUNTIME_CACHE = "see-runtime-v50";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -16,17 +17,20 @@ const APP_SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+  event.waitUntil(Promise.all([
+    caches.open(CORE_CACHE).then((cache) => cache.addAll(APP_SHELL)),
+    self.skipWaiting(),
+  ]));
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)),
-    )),
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys
+      .filter((key) => key !== CORE_CACHE && key !== RUNTIME_CACHE)
+      .map((key) => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
@@ -35,25 +39,26 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/", copy));
-          return response;
-        })
-        .catch(() => caches.match("/")),
-    );
+    const cachePromise = caches.open(CORE_CACHE);
+    const networkUpdate = cachePromise.then((cache) => fetch(request).then((response) => {
+      if (response.ok) return cache.put("/", response.clone()).then(() => response);
+      return response;
+    }));
+    event.waitUntil(networkUpdate.then(() => undefined).catch(() => undefined));
+    event.respondWith(cachePromise.then(async (cache) => (
+      await cache.match("/")
+      || networkUpdate
+    )).catch(() => fetch(request)));
     return;
   }
 
   if (["script", "style", "image", "font", "manifest"].includes(request.destination)) {
-    event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    event.respondWith(caches.open(RUNTIME_CACHE).then(async (cache) => (
+      await cache.match(request)
+      || fetch(request).then((response) => {
+        if (response.ok) return cache.put(request, response.clone()).then(() => response);
         return response;
-      })),
-    );
+      })
+    )));
   }
 });
