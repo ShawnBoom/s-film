@@ -1,4 +1,4 @@
-import { getFilterLut } from "./image-engine.js?v=44";
+import { getFilterLut } from "./image-engine.js?v=45";
 
 const VERTEX_SHADER = `#version 300 es
 in vec2 aPosition;

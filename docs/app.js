@@ -1,7 +1,7 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=44";
-import { createExportProcessor } from "./export-processor.js?v=44";
-import { hashSeed, processPixels } from "./image-engine.js?v=44";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=44";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=45";
+import { createExportProcessor } from "./export-processor.js?v=45";
+import { hashSeed, processPixels } from "./image-engine.js?v=45";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=45";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -69,7 +69,7 @@ const gpuPreview = DEBUG_MODE
 const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
 const exportProcessor = createExportProcessor({
   createWorker: () => new Worker(
-    new URL("./export-worker.js?v=44", import.meta.url),
+    new URL("./export-worker.js?v=45", import.meta.url),
     { type: "module" },
   ),
   onFailure(error) {
@@ -156,7 +156,7 @@ async function runGpuExportBenchmark() {
   updateDiagnosticOverlay();
 
   try {
-    const benchmark = await import("./gpu-export-benchmark.js?v=44");
+    const benchmark = await import("./gpu-export-benchmark.js?v=45");
     const snapshot = {
       url: photo.url,
       edit: { ...photo.edit },
@@ -788,7 +788,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=44", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=45", { scope: "./" }).catch(() => {});
   });
 }
 
