@@ -1,8 +1,8 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=46";
-import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=46";
-import { createExportProcessor } from "./export-processor.js?v=46";
-import { hashSeed, processPixels } from "./image-engine.js?v=46";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=46";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=47";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=47";
+import { createExportProcessor } from "./export-processor.js?v=47";
+import { hashSeed, processPixels } from "./image-engine.js?v=47";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=47";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -69,7 +69,7 @@ const gpuPreview = DEBUG_MODE
 const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
 const exportProcessor = createExportProcessor({
   createWorker: () => new Worker(
-    new URL("./export-worker.js?v=46", import.meta.url),
+    new URL("./export-worker.js?v=47", import.meta.url),
     { type: "module" },
   ),
   onFailure(error) {
@@ -133,6 +133,9 @@ function updateDiagnosticOverlay() {
     "Light: " + edit.brightness,
     "Color: " + edit.color,
     "Grain: " + edit.grain,
+    "Light v2: " + (edit.brightness === 0 ? "off" : "active"),
+    "Color v2: " + (edit.color === 0 ? "off" : "active"),
+    "Grain v2: " + (edit.grain === 0 ? "off" : "active"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback ? ["GPU fallback: " + exportTiming.gpuFallback] : []),
     ...(diagnostics.exportError ? ["Export Worker failed: " + diagnostics.exportError] : []),
@@ -766,7 +769,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=46", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=47", { scope: "./" }).catch(() => {});
   });
 }
 

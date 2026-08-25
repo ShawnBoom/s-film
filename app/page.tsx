@@ -688,6 +688,9 @@ export default function Home() {
     "Light: " + currentEdit.brightness,
     "Color: " + currentEdit.color,
     "Grain: " + currentEdit.grain,
+    "Light v2: " + (currentEdit.brightness === 0 ? "off" : "active"),
+    "Color v2: " + (currentEdit.color === 0 ? "off" : "active"),
+    "Grain v2: " + (currentEdit.grain === 0 ? "off" : "active"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback
       ? ["GPU fallback: " + exportTiming.gpuFallback]

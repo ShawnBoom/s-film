@@ -1,17 +1,17 @@
-import { S01_LUT, S01_LUT_SIZE } from "./s01-classic-neg-lut.js?v=46";
-import { S02_LUT, S02_LUT_SIZE } from "./s02-classic-chrome-lut.js?v=46";
-import { S03_LUT, S03_LUT_SIZE } from "./s03-classic-chrome-lut.js?v=46";
-import { S04_LUT, S04_LUT_SIZE } from "./s04-pro400h-lut.js?v=46";
-import { S05_LUT, S05_LUT_SIZE } from "./s05-superia400-lut.js?v=46";
-import { S06_LUT, S06_LUT_SIZE } from "./s06-color100-lut.js?v=46";
-import { S07_LUT, S07_LUT_SIZE } from "./s07-color800z-lut.js?v=46";
-import { S08_LUT, S08_LUT_SIZE } from "./s08-gold-blue-lut.js?v=46";
-import { S09_LUT, S09_LUT_SIZE } from "./s09-portra-cool-lut.js?v=46";
-import { S10_LUT, S10_LUT_SIZE } from "./s10-proimage-original-lut.js?v=46";
-import { S11_LUT, S11_LUT_SIZE } from "./s11-ektar100-lut.js?v=46";
-import { S12_LUT, S12_LUT_SIZE } from "./s12-portra400-lut.js?v=46";
-import { S13_LUT, S13_LUT_SIZE } from "./s13-gold200-lut.js?v=46";
-import { S14_LUT, S14_LUT_SIZE } from "./s14-chrome64-lut.js?v=46";
+import { S01_LUT, S01_LUT_SIZE } from "./s01-classic-neg-lut.js?v=47";
+import { S02_LUT, S02_LUT_SIZE } from "./s02-classic-chrome-lut.js?v=47";
+import { S03_LUT, S03_LUT_SIZE } from "./s03-classic-chrome-lut.js?v=47";
+import { S04_LUT, S04_LUT_SIZE } from "./s04-pro400h-lut.js?v=47";
+import { S05_LUT, S05_LUT_SIZE } from "./s05-superia400-lut.js?v=47";
+import { S06_LUT, S06_LUT_SIZE } from "./s06-color100-lut.js?v=47";
+import { S07_LUT, S07_LUT_SIZE } from "./s07-color800z-lut.js?v=47";
+import { S08_LUT, S08_LUT_SIZE } from "./s08-gold-blue-lut.js?v=47";
+import { S09_LUT, S09_LUT_SIZE } from "./s09-portra-cool-lut.js?v=47";
+import { S10_LUT, S10_LUT_SIZE } from "./s10-proimage-original-lut.js?v=47";
+import { S11_LUT, S11_LUT_SIZE } from "./s11-ektar100-lut.js?v=47";
+import { S12_LUT, S12_LUT_SIZE } from "./s12-portra400-lut.js?v=47";
+import { S13_LUT, S13_LUT_SIZE } from "./s13-gold200-lut.js?v=47";
+import { S14_LUT, S14_LUT_SIZE } from "./s14-chrome64-lut.js?v=47";
 
 const SRGB_TO_LINEAR = Array.from({ length: 256 }, (_, value) => {
   const channel = value / 255;
@@ -29,15 +29,6 @@ function linearToSrgb(value) {
   return channel <= 0.0031308
     ? channel * 12.92
     : 1.055 * channel ** (1 / 2.4) - 0.055;
-}
-
-function saturation(r, g, b, amount) {
-  const lightness = r * 0.299 + g * 0.587 + b * 0.114;
-  return [
-    lightness + (r - lightness) * amount,
-    lightness + (g - lightness) * amount,
-    lightness + (b - lightness) * amount,
-  ];
 }
 
 function lutIndex(size, r, g, b) {
