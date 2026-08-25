@@ -1,4 +1,4 @@
-import { getFilterLut, getLightParameters } from "./image-engine.js?v=46";
+import { getColorParameters, getFilterLut, getLightParameters } from "./image-engine.js?v=46";
 
 const VERTEX_SHADER = `#version 300 es
 in vec2 aPosition;
@@ -26,7 +26,8 @@ uniform int uLutSize;
 uniform float uStrength;
 uniform float uExposureGain;
 uniform bool uLightPositive;
-uniform float uColor;
+uniform float uColorBoost;
+uniform float uColorChromaScale;
 uniform float uGrain;
 uniform uint uSeed;
 uniform ivec2 uImageSize;
@@ -142,26 +143,27 @@ vec3 gamutMapOklab(vec3 lab) {
   return clamp(oklabToLinearRgb(vec3(lab.x, lab.yz * low)), 0.0, 1.0);
 }
 
-vec3 applyColor(vec3 rgb, float color) {
-  if (color == 0.0) return rgb;
+vec3 applyColor(vec3 rgb) {
+  if (uColorBoost == 0.0 && uColorChromaScale == 1.0) return rgb;
 
   vec3 lab = linearRgbToOklab(rgb);
   float chroma = length(lab.yz);
   if (chroma < 0.0000001) return rgb;
 
-  float amount = clamp(color / 100.0, -1.0, 1.0);
   float factor;
-  if (amount < 0.0) {
-    factor = 1.0 + amount;
+  if (uColorBoost == 0.0) {
+    factor = uColorChromaScale;
   } else {
-    float chromaLevel = min(1.0, chroma / 0.3);
     float hue = mod(degrees(atan(lab.z, lab.y)) + 360.0, 360.0);
     float rawDistance = abs(hue - 50.0);
     float skinDistance = min(rawDistance, 360.0 - rawDistance);
-    float skinProtection = max(0.0, 1.0 - skinDistance / 42.0)
-      * max(0.0, 1.0 - abs(lab.x - 0.65) / 0.38);
-    float vibranceResponse = 0.82 - 0.58 * chromaLevel;
-    factor = 1.0 + amount * vibranceResponse * (1.0 - skinProtection * 0.38);
+    float hueProtection = exp(-0.5 * pow(skinDistance / 34.0, 2.0));
+    float lightnessProtection = exp(-0.5 * pow((lab.x - 0.65) / 0.28, 2.0));
+    float skinProtection = hueProtection * lightnessProtection;
+    float chromaRatio = chroma / 0.12;
+    float lowChromaWeight = 1.0 / (1.0 + chromaRatio * chromaRatio);
+    float vibranceResponse = 0.16 + 0.84 * lowChromaWeight;
+    factor = 1.0 + uColorBoost * vibranceResponse * (1.0 - 0.7 * skinProtection);
   }
 
   return gamutMapOklab(vec3(lab.x, lab.yz * factor));
@@ -229,7 +231,7 @@ void main() {
   }
 
   rgb = applyExposure(rgb);
-  rgb = applyColor(rgb, uColor);
+  rgb = applyColor(rgb);
   vec2 pixel = floor(vUv * vec2(uImageSize));
   rgb = applyGrain(rgb, pixel, uGrain);
   outColor = vec4(linearToSrgb(rgb), source.a);
@@ -321,7 +323,8 @@ class GpuPreviewRenderer {
       strength: location(gl, this.program, "uStrength"),
       exposureGain: location(gl, this.program, "uExposureGain"),
       lightPositive: location(gl, this.program, "uLightPositive"),
-      color: location(gl, this.program, "uColor"),
+      colorBoost: location(gl, this.program, "uColorBoost"),
+      colorChromaScale: location(gl, this.program, "uColorChromaScale"),
       grain: location(gl, this.program, "uGrain"),
       seed: location(gl, this.program, "uSeed"),
       imageSize: location(gl, this.program, "uImageSize"),
@@ -436,7 +439,9 @@ class GpuPreviewRenderer {
     const light = getLightParameters(edit.brightness ?? 0);
     gl.uniform1f(this.uniforms.exposureGain, light.gain);
     gl.uniform1i(this.uniforms.lightPositive, light.positive ? 1 : 0);
-    gl.uniform1f(this.uniforms.color, edit.color ?? 0);
+    const color = getColorParameters(edit.color ?? 0);
+    gl.uniform1f(this.uniforms.colorBoost, color.boost);
+    gl.uniform1f(this.uniforms.colorChromaScale, color.chromaScale);
     gl.uniform1f(this.uniforms.grain, edit.grain ?? 0);
     gl.uniform1ui(this.uniforms.seed, seed >>> 0);
     gl.uniform2i(this.uniforms.imageSize, this.canvas.width, this.canvas.height);

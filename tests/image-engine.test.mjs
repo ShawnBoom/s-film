@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
-import { createNeutralEdit, getLightParameters, processPixels } from "../lib/image-engine.js";
+import {
+  createNeutralEdit,
+  getColorParameters,
+  getLightParameters,
+  processPixels,
+} from "../lib/image-engine.js";
 
 const source = {
   width: 3,
@@ -85,6 +90,69 @@ test("Light v2 is true exposure reduction for negative values and protects posit
   assert.ok(brightened[4] > 96);
   assert.ok(brightened[8] < 255);
   assert.ok((brightened[4] / 96) > (brightened[8] / 235));
+});
+
+function srgbChannelToLinear(value) {
+  const channel = value / 255;
+  return channel <= 0.04045
+    ? channel / 12.92
+    : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+function pixelOklabChroma(bytes, offset) {
+  const r = srgbChannelToLinear(bytes[offset]);
+  const g = srgbChannelToLinear(bytes[offset + 1]);
+  const b = srgbChannelToLinear(bytes[offset + 2]);
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  const lRoot = Math.cbrt(Math.max(0, l));
+  const mRoot = Math.cbrt(Math.max(0, m));
+  const sRoot = Math.cbrt(Math.max(0, s));
+  const a = 1.9779984951 * lRoot - 2.428592205 * mRoot + 0.4505937099 * sRoot;
+  const bValue = 0.0259040371 * lRoot + 0.7827717662 * mRoot - 0.808675766 * sRoot;
+  return Math.hypot(a, bValue);
+}
+
+test("Color v2 precomputes softened positive and negative response curves", () => {
+  assert.equal(getColorParameters(0).active, false);
+  assert.ok(Math.abs(getColorParameters(50).boost - 0.58 * 0.5 ** 1.15) < 1e-12);
+  assert.ok(Math.abs(getColorParameters(-50).chromaScale - (1 - 0.5 ** 1.15)) < 1e-12);
+  assert.equal(getColorParameters(-100).chromaScale, 0);
+});
+
+test("Color v2 wakes low-chroma colors before saturated colors and protects skin hues", () => {
+  const colors = {
+    width: 3,
+    height: 1,
+    data: new Uint8ClampedArray([
+      112, 126, 140, 255,
+      25, 70, 220, 255,
+      190, 125, 100, 255,
+    ]),
+  };
+  const result = processPixels(
+    colors,
+    { filter: null, strength: 100, brightness: 0, color: 50, grain: 0 },
+  );
+  const gains = [0, 4, 8].map((offset) =>
+    pixelOklabChroma(result, offset) / pixelOklabChroma(colors.data, offset));
+
+  assert.ok(gains[0] > gains[1]);
+  assert.ok(gains[0] > gains[2]);
+  assert.ok(gains[1] < 1.1);
+  assert.ok(gains[2] < 1.12);
+});
+
+test("Color v2 reaches perceptual grayscale at -100", () => {
+  const result = processPixels(
+    source,
+    { filter: null, strength: 100, brightness: 0, color: -100, grain: 0 },
+  );
+  for (let offset = 0; offset < result.length; offset += 4) {
+    const channels = [result[offset], result[offset + 1], result[offset + 2]];
+    assert.ok(Math.max(...channels) - Math.min(...channels) <= 1);
+  }
 });
 
 test("preset strength zero restores the exact original", () => {
