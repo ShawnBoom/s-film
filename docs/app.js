@@ -1,5 +1,5 @@
-import { hashSeed, processPixels } from "./image-engine.js?v=36";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=36";
+import { hashSeed, processPixels } from "./image-engine.js?v=37";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=37";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -526,7 +526,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=36", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=37", { scope: "./" }).catch(() => {});
   });
 }
 
