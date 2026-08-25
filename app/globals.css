@@ -372,9 +372,9 @@ input:focus-visible {
 }
 
 .adjustment-panel {
-  flex: 0 0 64px;
-  min-height: 64px;
-  padding: 5px 12px 6px;
+  flex: 0 0 74px;
+  min-height: 74px;
+  padding: 2px 12px 3px;
 }
 
 .adjustment-tabs {
@@ -408,18 +408,18 @@ input:focus-visible {
   grid-template-columns: minmax(0, 1fr) 54px;
   align-items: center;
   gap: 9px;
-  min-height: 27px;
-  padding-top: 4px;
+  min-height: 40px;
+  padding-top: 0;
 }
 
 .range-control {
   width: 100%;
-  height: 20px;
+  height: 40px;
   margin: 0;
   appearance: none;
   background: transparent;
   cursor: pointer;
-  touch-action: pan-x;
+  touch-action: none;
 }
 
 .range-control::-webkit-slider-runnable-track {
@@ -559,9 +559,8 @@ input:focus-visible {
   .compare-button,
   .photo-count { bottom: 44px; }
   .filter-row { flex-basis: 64px; min-height: 64px; }
-  .adjustment-panel { flex-basis: 60px; min-height: 60px; padding-block: 4px 5px; }
+  .adjustment-panel { flex-basis: 70px; min-height: 70px; padding-block: 2px 3px; }
   .adjustment-tab { min-height: 24px; }
-  .slider-row { padding-top: 3px; }
   .bottom-actions { flex-basis: 38px; min-height: 38px; margin-bottom: 5px; }
 }
 
