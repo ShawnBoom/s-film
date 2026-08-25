@@ -55,6 +55,17 @@ function createNeutralEdit(): EditState {
   return { filter: null, strength: 100, brightness: 0, color: 0, grain: 0 };
 }
 
+function createSessionGrainSeed(file: File, instanceId: string) {
+  const randomValues = new Uint32Array(1);
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(randomValues);
+    return randomValues[0];
+  }
+  return hashSeed(
+    file.name + ":" + file.size + ":" + instanceId + ":" + Date.now() + ":" + Math.random(),
+  );
+}
+
 async function loadImage(url: string) {
   const image = new Image();
   image.decoding = "async";
@@ -449,7 +460,7 @@ export default function Home() {
         filename: file.name,
         width: 0,
         height: 0,
-        grainSeed: hashSeed(file.name + ":" + file.size + ":" + file.lastModified + ":" + id),
+        grainSeed: createSessionGrainSeed(file, id),
         edit: createNeutralEdit(),
       };
     });
@@ -689,8 +700,9 @@ export default function Home() {
     "Color: " + currentEdit.color,
     "Grain: " + currentEdit.grain,
     "Light v2: " + (currentEdit.brightness === 0 ? "off" : "active"),
-    "Color v2: " + (currentEdit.color === 0 ? "off" : "active"),
-    "Grain v2: " + (currentEdit.grain === 0 ? "off" : "active"),
+    "Color v2.1: " + (currentEdit.color === 0 ? "off" : "active"),
+    "Grain v2.1: " + (currentEdit.grain === 0 ? "off" : "active"),
+    "grainSeed: " + (currentPhoto ? currentPhoto.grainSeed : "—"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback
       ? ["GPU fallback: " + exportTiming.gpuFallback]

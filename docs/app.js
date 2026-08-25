@@ -134,8 +134,9 @@ function updateDiagnosticOverlay() {
     "Color: " + edit.color,
     "Grain: " + edit.grain,
     "Light v2: " + (edit.brightness === 0 ? "off" : "active"),
-    "Color v2: " + (edit.color === 0 ? "off" : "active"),
-    "Grain v2: " + (edit.grain === 0 ? "off" : "active"),
+    "Color v2.1: " + (edit.color === 0 ? "off" : "active"),
+    "Grain v2.1: " + (edit.grain === 0 ? "off" : "active"),
+    "grainSeed: " + (photo ? photo.grainSeed : "—"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback ? ["GPU fallback: " + exportTiming.gpuFallback] : []),
     ...(diagnostics.exportError ? ["Export Worker failed: " + diagnostics.exportError] : []),
@@ -169,6 +170,17 @@ if (DEBUG_MODE) updateDiagnosticOverlay();
 
 function createNeutralEdit() {
   return { filter: null, strength: 100, brightness: 0, color: 0, grain: 0 };
+}
+
+function createSessionGrainSeed(file, instanceId) {
+  const randomValues = new Uint32Array(1);
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(randomValues);
+    return randomValues[0];
+  }
+  return hashSeed(
+    file.name + ":" + file.size + ":" + instanceId + ":" + Date.now() + ":" + Math.random(),
+  );
 }
 
 function currentPhoto() {
@@ -426,7 +438,7 @@ function handleFiles(files) {
       filename: file.name,
       width: 0,
       height: 0,
-      grainSeed: hashSeed(file.name + ":" + file.size + ":" + file.lastModified + ":" + id),
+      grainSeed: createSessionGrainSeed(file, id),
       edit: createNeutralEdit(),
     });
   });

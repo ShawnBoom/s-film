@@ -34,7 +34,7 @@ uniform bool uLightPositive;
 uniform float uColorBoost;
 uniform float uColorFade;
 uniform float uGrainCoordinateScale;
-uniform float uGrainBaseScale;
+uniform vec4 uGrainScales;
 uniform float uGrainAmplitude;
 uniform vec3 uGrainWeights;
 uniform float uGrainClusterStrength;
@@ -212,10 +212,12 @@ vec3 applyGrain(vec3 rgb, vec2 point) {
   if (uGrainAmplitude == 0.0) return rgb;
 
   vec2 normalizedPoint = point * uGrainCoordinateScale;
-  float fine = valueNoise(normalizedPoint, uGrainBaseScale, uSeed);
-  float medium = valueNoise(normalizedPoint, uGrainBaseScale * 2.4, uSeed ^ 0x045d9f3bu);
-  float coarse = valueNoise(normalizedPoint, uGrainBaseScale * 5.8, uSeed ^ 0x27d4eb2du);
-  float cluster = valueNoise(normalizedPoint, uGrainBaseScale * 12.5, uSeed ^ 0x165667b1u);
+  float rawFine = valueNoise(normalizedPoint, uGrainScales.x, uSeed);
+  float rawMedium = valueNoise(normalizedPoint, uGrainScales.y, uSeed ^ 0x045d9f3bu);
+  float fine = sign(rawFine) * pow(abs(rawFine), 0.72);
+  float medium = sign(rawMedium) * pow(abs(rawMedium), 0.72);
+  float coarse = valueNoise(normalizedPoint, uGrainScales.z, uSeed ^ 0x27d4eb2du);
+  float cluster = valueNoise(normalizedPoint, uGrainScales.w, uSeed ^ 0x165667b1u);
   float textureValue = dot(vec3(fine, medium, coarse), uGrainWeights)
     * (1.0 + cluster * uGrainClusterStrength);
   float luminance = clamp01(dot(rgb, vec3(0.2126, 0.7152, 0.0722)));
@@ -334,7 +336,7 @@ class GpuPreviewRenderer {
       colorBoost: location(gl, this.program, "uColorBoost"),
       colorFade: location(gl, this.program, "uColorFade"),
       grainCoordinateScale: location(gl, this.program, "uGrainCoordinateScale"),
-      grainBaseScale: location(gl, this.program, "uGrainBaseScale"),
+      grainScales: location(gl, this.program, "uGrainScales"),
       grainAmplitude: location(gl, this.program, "uGrainAmplitude"),
       grainWeights: location(gl, this.program, "uGrainWeights"),
       grainClusterStrength: location(gl, this.program, "uGrainClusterStrength"),
@@ -460,7 +462,13 @@ class GpuPreviewRenderer {
       this.canvas.height,
     );
     gl.uniform1f(this.uniforms.grainCoordinateScale, grain.coordinateScale);
-    gl.uniform1f(this.uniforms.grainBaseScale, grain.baseScale);
+    gl.uniform4f(
+      this.uniforms.grainScales,
+      grain.fineScale,
+      grain.mediumScale,
+      grain.coarseScale,
+      grain.clusterScale,
+    );
     gl.uniform1f(this.uniforms.grainAmplitude, grain.amplitude);
     gl.uniform3f(
       this.uniforms.grainWeights,
