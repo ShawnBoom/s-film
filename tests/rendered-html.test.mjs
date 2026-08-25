@@ -268,6 +268,11 @@ test("uses the requested filter labels and interface colors", async () => {
     assert.match(styles, /\.compare-button\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.thumbnail\.add-photo\s*\{[^}]*color:\s*var\(--control-surface\)/s);
     assert.match(styles, /\.value-input\s*\{[^}]*color:\s*var\(--control-surface\)[^}]*font-size:\s*15px/s);
+    assert.match(styles, /\.adjustment-panel\s*\{[^}]*flex:\s*0 0 74px[^}]*min-height:\s*74px/s);
+    assert.match(styles, /\.slider-row\s*\{[^}]*min-height:\s*40px[^}]*padding-top:\s*0/s);
+    assert.match(styles, /\.range-control\s*\{[^}]*height:\s*40px[^}]*touch-action:\s*none/s);
+    assert.match(styles, /\.range-control::-webkit-slider-runnable-track\s*\{[^}]*height:\s*3px/s);
+    assert.match(styles, /\.range-control::-webkit-slider-thumb\s*\{[^}]*width:\s*15px[^}]*height:\s*15px/s);
     assert.match(styles, /\.photo-count\s*\{[^}]*background:\s*transparent[^}]*color:\s*var\(--privacy-dot\)/s);
     assert.match(styles, /\.bottom-action:active:not\(:disabled\)\s*\{[^}]*padding-right:\s*5px[^}]*padding-left:\s*5px[^}]*border-color:\s*var\(--privacy-dot\)[^}]*background:\s*var\(--privacy-dot\)[^}]*color:\s*var\(--accent\)/s);
     assert.match(styles, /\.thumbnail-rail\s*\{[^}]*position:\s*absolute[^}]*height:\s*40px/s);
@@ -285,40 +290,39 @@ test("uses the requested filter labels and interface colors", async () => {
 });
 
 test("ships cache-busted, relative GitHub Pages assets", async () => {
-  const [staticHtml, staticWorker, staticApp, appWorker] = await Promise.all([
+  const [staticHtml, staticWorker, staticApp, staticEngine, staticLoader, appWorker] = await Promise.all([
     readFile(new URL("../docs/index.html", import.meta.url), "utf8"),
     readFile(new URL("../docs/sw.js", import.meta.url), "utf8"),
     readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/image-engine.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/lut-loader.js", import.meta.url), "utf8"),
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=48"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=48"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=48"/);
-  assert.match(staticWorker, /see-static-v48/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=48/);
-  assert.match(staticWorker, /gpu-export\.js\?v=48/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=50"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=50"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=50"/);
+  assert.match(staticApp, /from "\.\/lut-loader\.js\?v=50"/);
+  assert.match(staticWorker, /see-core-v50/);
+  assert.match(staticWorker, /see-luts-v50/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=50/);
+  assert.match(staticWorker, /gpu-export\.js\?v=50/);
   assert.doesNotMatch(staticWorker, /gpu-export-benchmark/);
-  assert.match(staticWorker, /export-processor\.js\?v=48/);
-  assert.match(staticWorker, /export-worker\.js\?v=48/);
-  assert.match(staticWorker, /image-engine\.js\?v=48/);
-  assert.match(staticWorker, /edit-state\.js\?v=48/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=48/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=48/);
-  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=48/);
-  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=48/);
-  assert.match(staticWorker, /s05-superia400-lut\.js\?v=48/);
-  assert.match(staticWorker, /s06-color100-lut\.js\?v=48/);
-  assert.match(staticWorker, /s07-color800z-lut\.js\?v=48/);
-  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=48/);
-  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=48/);
-  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=48/);
-  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=48/);
-  assert.match(staticWorker, /s12-portra400-lut\.js\?v=48/);
-  assert.match(staticWorker, /s13-gold200-lut\.js\?v=48/);
-  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=48/);
+  assert.match(staticWorker, /export-processor\.js\?v=50/);
+  assert.match(staticWorker, /export-worker\.js\?v=50/);
+  assert.match(staticWorker, /image-engine\.js\?v=50/);
+  assert.match(staticWorker, /edit-state\.js\?v=50/);
+  assert.match(staticWorker, /lut-loader\.js\?v=50/);
+  const coreShell = staticWorker.match(/const CORE_APP_SHELL = \[([\s\S]*?)\n\];/)?.[1] ?? "";
+  assert.doesNotMatch(coreShell, /s(?:0[1-9]|1[0-4])-[^"']+-lut\.js/);
+  assert.doesNotMatch(staticEngine, /from "\.\/s(?:0[1-9]|1[0-4])-[^"]+-lut\.js"/);
+  assert.equal(Array.from(staticLoader.matchAll(/\(\) => import\("\.\/s(?:0[1-9]|1[0-4])-[^"]+-lut\.js\?v=50"\)/g)).length, 14);
+  assert.match(staticWorker, /request\.mode === "navigate"/);
+  assert.match(staticWorker, /await cache\.match\(ROOT\)[\s\S]*\|\| networkUpdate/);
+  assert.match(staticWorker, /isLutRequest/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-v27/);
+  assert.match(appWorker, /see-core-v50/);
+  assert.match(appWorker, /see-runtime-v50/);
   assert.match(appWorker, /see-welcome\.png/);
 });
 
@@ -360,9 +364,11 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(page, /crypto\?\.getRandomValues/);
   assert.match(staticApp, /grainSeed: createSessionGrainSeed\(file, id\)/);
   assert.match(staticApp, /await attemptGpuFullResolutionExport/);
-  assert.match(staticApp, /await exportProcessor\.process\(source, photo\.edit, photo\.grainSeed\)/);
+  assert.match(staticApp, /await ensureExportProcessor\(\)\.process\(source, photo\.edit, photo\.grainSeed\)/);
   assert.match(staticApp, /processPixels\(source, photo\.edit, photo\.grainSeed\)/);
-  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=48"/);
+  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=50"/);
+  assert.match(exportWorker, /import \{ loadFilterLut \} from "\.\/lut-loader\.js\?v=50"/);
+  assert.match(exportWorker, /await loadFilterLut\(message\.edit\?\.filter\)/);
   assert.match(exportWorker, /const pixels = processPixels\(source, message\.edit, message\.seed\)/);
 
   const sliderUpdate = staticApp.match(/function updateAdjustmentValue\(value\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
@@ -383,6 +389,12 @@ test("shows actual preview and production export diagnostics only for debug quer
 
   assert.match(staticApp, /URLSearchParams\(window\.location\.search\)\.get\("debug"\) === "1"/);
   assert.match(staticApp, /DEBUG_MODE \? createDiagnosticOverlay\(\) : null/);
+  assert.match(staticHtml, /window\.__SEE_BOOT__/);
+  assert.match(staticHtml, /first pointerdown/);
+  assert.match(staticApp, /markStartup\("module entry"\)/);
+  assert.match(staticApp, /markStartup\("listeners ready"\)/);
+  assert.match(staticApp, /markStartup\("\+ functional"\)/);
+  assert.match(staticApp, /dataset\.appReady = "true"/);
   assert.match(staticApp, /WebGL2 GPU/);
   assert.match(staticApp, /CPU fallback/);
   assert.match(staticApp, /GPU init failed:/);
@@ -447,6 +459,7 @@ test("paints Saving feedback before sequential GPU-primary export and preserves 
   assert.match(staticApp, /attemptGpuFullResolutionExport/);
   assert.match(staticApp, /cpuResult\.processor === "worker"[\s\S]*\? "worker-fallback"/);
   assert.match(processor, /\[source\.data\.buffer\]/);
+  assert.match(processor, /function ensureWorker\(\)/);
   assert.match(processor, /processor: "main-thread"/);
   assert.match(worker, /\[pixels\.buffer\]/);
   assert.doesNotMatch(worker, /OffscreenCanvas/);
