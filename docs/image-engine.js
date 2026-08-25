@@ -239,23 +239,11 @@ function applyColor(r, g, b, parameters) {
   return gamutMapOklab(L, a * factor, bValue * factor);
 }
 
-function particleCellState(x, y, seed) {
+function grainCellState(x, y, seed) {
   let state = (Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ seed) >>> 0;
   state = Math.imul(state ^ (state >>> 13), 1274126177) >>> 0;
   state = (state ^ (state >>> 16)) >>> 0;
   return state === 0 ? 0x6d2b79f5 : state;
-}
-
-function nextParticleState(state) {
-  let value = state >>> 0;
-  value = (value ^ (value << 13)) >>> 0;
-  value = (value ^ (value >>> 17)) >>> 0;
-  value = (value ^ (value << 5)) >>> 0;
-  return value;
-}
-
-function particleRandom(state) {
-  return state / 4294967295;
 }
 
 function smoothstepRange(low, high, value) {
@@ -268,125 +256,107 @@ export function getGrainParameters(grain, width, height) {
   if (amount === 0) {
     return {
       active: false,
-      engine: "v3-particle",
+      engine: "v4-correlated",
+      amount: 0,
       referenceLongEdge: 960,
       coordinateScale: 0,
-      cellSize: 4,
-      contrast: 0,
-      fineActivation: 0,
-      mediumActivation: 0,
-      coarseActivation: 0,
-      finePopulation: 0.7,
-      mediumPopulation: 0.23,
-      coarsePopulation: 0.07,
-      fineRadiusMin: 0.5,
-      fineRadiusMax: 0.8,
-      mediumRadiusMin: 0.9,
-      mediumRadiusMax: 1.4,
-      coarseRadiusMin: 1.5,
-      coarseRadiusMax: 2.25,
-      shadowVisibility: 0.65,
-      highlightVisibility: 0.7,
+      primaryScale: 3.6,
+      correlationRadius: 0,
+      variance: 0,
+      roughness: 0,
+      detailCoupling: 0,
+      acutanceRecovery: 0,
     };
   }
 
-  const density = 0.08 + 0.86 * amount ** 0.82;
   return {
     active: true,
-    engine: "v3-particle",
+    engine: "v4-correlated",
+    amount,
     referenceLongEdge: 960,
     coordinateScale: 960 / Math.max(1, width, height),
-    cellSize: 4,
-    contrast: 0.055 + 0.145 * amount ** 0.85,
-    fineActivation: density,
-    mediumActivation: density * smoothstepRange(0.12, 0.68, amount),
-    coarseActivation: density * smoothstepRange(0.42, 0.95, amount),
-    finePopulation: 0.7,
-    mediumPopulation: 0.23,
-    coarsePopulation: 0.07,
-    fineRadiusMin: 0.5,
-    fineRadiusMax: 0.8,
-    mediumRadiusMin: 0.9,
-    mediumRadiusMax: 1.4,
-    coarseRadiusMin: 1.5,
-    coarseRadiusMax: 2.25,
-    shadowVisibility: 0.65,
-    highlightVisibility: 0.7,
+    primaryScale: 3.6,
+    correlationRadius: 3.6,
+    variance: 0.12 * amount ** 0.82,
+    roughness: 0.1 + 0.45 * amount ** 0.9,
+    detailCoupling: 0.09 * amount ** 1.35,
+    acutanceRecovery: 0.007 * amount ** 1.5,
   };
 }
 
-function sampleGrain(r, g, b, x, y, parameters, seed) {
+function grainLatticeValue(x, y, seed) {
+  return grainCellState(x, y, seed) / 4294967295 * 2 - 1;
+}
+
+function sampleCorrelatedExcitation(x, y, scale, seed) {
+  const scaledX = x / scale;
+  const scaledY = y / scale;
+  const originX = Math.floor(scaledX);
+  const originY = Math.floor(scaledY);
+  const blendX = smoothstepRange(0, 1, scaledX - originX);
+  const blendY = smoothstepRange(0, 1, scaledY - originY);
+  const top = grainLatticeValue(originX, originY, seed)
+    + (grainLatticeValue(originX + 1, originY, seed)
+      - grainLatticeValue(originX, originY, seed)) * blendX;
+  const bottom = grainLatticeValue(originX, originY + 1, seed)
+    + (grainLatticeValue(originX + 1, originY + 1, seed)
+      - grainLatticeValue(originX, originY + 1, seed)) * blendX;
+  return top + (bottom - top) * blendY;
+}
+
+function sampleCorrelatedGrainField(x, y, parameters, seed) {
   const pointX = (x + 0.5) * parameters.coordinateScale;
   const pointY = (y + 0.5) * parameters.coordinateScale;
-  const originX = Math.floor(pointX / parameters.cellSize);
-  const originY = Math.floor(pointY / parameters.cellSize);
-  let texture = 0;
+  const first = sampleCorrelatedExcitation(pointX, pointY, parameters.primaryScale, seed);
+  const rotatedX = 0.70710678 * (pointX - pointY) + 19.37;
+  const rotatedY = 0.70710678 * (pointX + pointY) - 7.91;
+  const second = sampleCorrelatedExcitation(
+    rotatedX,
+    rotatedY,
+    parameters.primaryScale,
+    seed ^ 0x9e3779b9,
+  );
+  const mixed = 0.78 * first + 0.52 * second;
+  const localRoughness = 1 + parameters.roughness * 0.65 * Math.abs(first - second);
+  return Math.max(-1.8, Math.min(1.8, mixed * localRoughness));
+}
 
-  for (let cellOffsetY = -1; cellOffsetY <= 1; cellOffsetY += 1) {
-    for (let cellOffsetX = -1; cellOffsetX <= 1; cellOffsetX += 1) {
-      const cellX = originX + cellOffsetX;
-      const cellY = originY + cellOffsetY;
-      let state = particleCellState(cellX, cellY, seed);
-      state = nextParticleState(state);
-      const centerOffsetX = particleRandom(state);
-      state = nextParticleState(state);
-      const centerOffsetY = particleRandom(state);
-      state = nextParticleState(state);
-      const activationThreshold = particleRandom(state);
-      state = nextParticleState(state);
-      const population = particleRandom(state);
+function sourceLuminanceAt(source, x, y) {
+  const sampleX = Math.max(0, Math.min(source.width - 1, x));
+  const sampleY = Math.max(0, Math.min(source.height - 1, y));
+  const offset = (sampleY * source.width + sampleX) * 4;
+  return (
+    source.data[offset] * 0.2126
+    + source.data[offset + 1] * 0.7152
+    + source.data[offset + 2] * 0.0722
+  ) / 255;
+}
 
-      let activation;
-      let minimumRadius;
-      let maximumRadius;
-      if (population < parameters.finePopulation) {
-        activation = parameters.fineActivation;
-        minimumRadius = parameters.fineRadiusMin;
-        maximumRadius = parameters.fineRadiusMax;
-      } else if (population < parameters.finePopulation + parameters.mediumPopulation) {
-        activation = parameters.mediumActivation;
-        minimumRadius = parameters.mediumRadiusMin;
-        maximumRadius = parameters.mediumRadiusMax;
-      } else {
-        activation = parameters.coarseActivation;
-        minimumRadius = parameters.coarseRadiusMin;
-        maximumRadius = parameters.coarseRadiusMax;
-      }
-      if (activationThreshold > activation) continue;
+function sourceMicroDetail(source, x, y) {
+  const center = sourceLuminanceAt(source, x, y);
+  const neighbors = (
+    sourceLuminanceAt(source, x - 1, y)
+    + sourceLuminanceAt(source, x + 1, y)
+    + sourceLuminanceAt(source, x, y - 1)
+    + sourceLuminanceAt(source, x, y + 1)
+  ) * 0.25;
+  return center - neighbors;
+}
 
-      state = nextParticleState(state);
-      const radiusRandomA = particleRandom(state);
-      state = nextParticleState(state);
-      const radiusRandomB = particleRandom(state);
-      const radiusMix = Math.sqrt(radiusRandomA * radiusRandomB);
-      const radius = minimumRadius + (maximumRadius - minimumRadius) * radiusMix;
-      const centerX = (cellX + centerOffsetX) * parameters.cellSize;
-      const centerY = (cellY + centerOffsetY) * parameters.cellSize;
-      const distance = Math.hypot(pointX - centerX, pointY - centerY);
-      const feather = Math.max(radius * 0.22, parameters.coordinateScale * 0.45);
-      const coverage = 1 - smoothstepRange(
-        Math.max(0, radius - feather),
-        radius + feather,
-        distance,
-      );
-      if (coverage <= 0) continue;
-
-      state = nextParticleState(state);
-      const polarity = particleRandom(state) < 0.5 ? -1 : 1;
-      state = nextParticleState(state);
-      const localIntensity = 0.72 + 0.56 * particleRandom(state);
-      texture += polarity * localIntensity * coverage;
-    }
-  }
-
+function sampleGrain(r, g, b, x, y, microDetail, parameters, seed) {
+  const texture = sampleCorrelatedGrainField(x, y, parameters, seed);
   const luminance = clamp01(r * 0.2126 + g * 0.7152 + b * 0.0722);
-  const edgeVisibility = parameters.shadowVisibility
-    + (parameters.highlightVisibility - parameters.shadowVisibility) * luminance;
-  const midtone = 4 * luminance * (1 - luminance);
-  const visibility = edgeVisibility + (1 - edgeVisibility) * midtone * midtone;
+  const exposureResponse = Math.sqrt(0.58 + 0.42 * clamp01(4 * luminance * (1 - luminance)));
   const perceptualLuminance = linearToSrgb(luminance);
+  const absoluteDetail = Math.abs(microDetail);
+  const integrationWeight = 1 - smoothstepRange(0.035, 0.18, absoluteDetail);
+  const edgeWeight = smoothstepRange(0.05, 0.18, absoluteDetail)
+    * (1 - smoothstepRange(0.3, 0.55, absoluteDetail));
   const targetLuminance = clamp01(
-    perceptualLuminance + texture * parameters.contrast * visibility,
+    perceptualLuminance
+      + texture * parameters.variance * exposureResponse
+      - microDetail * parameters.detailCoupling * integrationWeight
+      + microDetail * parameters.acutanceRecovery * edgeWeight,
   );
   return srgbToLinear(targetLuminance) - luminance;
 }
@@ -444,7 +414,8 @@ export function processPixels(source, edit, seed = 1) {
       if (lightParameters.active) [r, g, b] = applyExposure(r, g, b, lightParameters);
       if (colorParameters.active) [r, g, b] = applyColor(r, g, b, colorParameters);
       if (grainParameters.active) {
-        const grainValue = sampleGrain(r, g, b, x, y, grainParameters, seed);
+        const microDetail = sourceMicroDetail(source, x, y);
+        const grainValue = sampleGrain(r, g, b, x, y, microDetail, grainParameters, seed);
         r += grainValue;
         g += grainValue;
         b += grainValue;

@@ -8,7 +8,7 @@ import type { ChangeEvent, CSSProperties } from "react";
 import { createExportProcessor } from "../lib/export-processor.js";
 import { attemptGpuFullResolutionExport } from "../lib/gpu-export.js";
 import { createGpuPreviewRenderer } from "../lib/gpu-preview.js";
-import { hashSeed, processPixels } from "../lib/image-engine.js";
+import { getGrainParameters, hashSeed, processPixels } from "../lib/image-engine.js";
 import { loadFilterLut } from "../lib/lut-loader.js";
 import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
 
@@ -747,6 +747,11 @@ export default function Home() {
   const diagnosticTimingLabel = diagnosticPath === "gpu" ? "Submit" : "Render";
   const diagnosticAverageLabel = diagnosticPath === "gpu" ? "Average submit" : "Average";
   const diagnosticSource = sourceDataRef.current;
+  const diagnosticGrain = getGrainParameters(
+    currentEdit.grain,
+    currentPhoto?.width ?? 1,
+    currentPhoto?.height ?? 1,
+  );
   const diagnosticFilterActive = Boolean(currentEdit.filter && currentEdit.strength > 0);
   const exportTiming = diagnosticsRef.current.exportTiming;
   const exportDuration = (value: number | null) => value === null ? "—" : value.toFixed(1) + " ms";
@@ -800,8 +805,11 @@ export default function Home() {
     "Grain: " + currentEdit.grain,
     "Light v2: " + (currentEdit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (currentEdit.color === 0 ? "off" : "active"),
-    "Grain engine: v3 particle " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
+    "Grain engine: v4 correlated " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
     "Reference grain scale: 960 px long edge",
+    "Correlation radius: " + diagnosticGrain.correlationRadius.toFixed(2) + " ref px",
+    "Roughness: " + diagnosticGrain.roughness.toFixed(3),
+    "Detail coupling: " + diagnosticGrain.detailCoupling.toFixed(3),
     "grainSeed: " + (currentPhoto ? currentPhoto.grainSeed : "—"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback

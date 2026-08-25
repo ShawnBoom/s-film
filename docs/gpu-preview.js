@@ -34,9 +34,11 @@ uniform bool uLightPositive;
 uniform float uColorBoost;
 uniform float uColorFade;
 uniform float uGrainCoordinateScale;
-uniform float uGrainCellSize;
-uniform float uGrainContrast;
-uniform vec3 uGrainActivation;
+uniform float uGrainPrimaryScale;
+uniform float uGrainVariance;
+uniform float uGrainRoughness;
+uniform float uGrainDetailCoupling;
+uniform float uGrainAcutanceRecovery;
 uniform uint uSeed;
 uniform ivec2 uImageSize;
 
@@ -185,81 +187,75 @@ vec3 applyColor(vec3 rgb) {
   return gamutMapOklab(vec3(lab.x, lab.yz * factor));
 }
 
-uint particleCellState(ivec2 point, uint seed) {
+uint grainCellState(ivec2 point, uint seed) {
   uint value = uint(point.x) * 374761393u ^ uint(point.y) * 668265263u ^ seed;
   value = (value ^ (value >> 13u)) * 1274126177u;
   value ^= value >> 16u;
   return value == 0u ? 0x6d2b79f5u : value;
 }
 
-float particleRandom(inout uint state) {
-  state ^= state << 13u;
-  state ^= state >> 17u;
-  state ^= state << 5u;
-  return float(state) / 4294967295.0;
+float grainLatticeValue(ivec2 point, uint seed) {
+  return float(grainCellState(point, seed)) / 4294967295.0 * 2.0 - 1.0;
 }
 
-float particleField(vec2 point) {
-  ivec2 origin = ivec2(floor(point / uGrainCellSize));
-  float textureValue = 0.0;
-
-  for (int cellOffsetY = -1; cellOffsetY <= 1; cellOffsetY += 1) {
-    for (int cellOffsetX = -1; cellOffsetX <= 1; cellOffsetX += 1) {
-      ivec2 cell = origin + ivec2(cellOffsetX, cellOffsetY);
-      uint state = particleCellState(cell, uSeed);
-      float centerOffsetX = particleRandom(state);
-      float centerOffsetY = particleRandom(state);
-      vec2 centerOffset = vec2(centerOffsetX, centerOffsetY);
-      float activationThreshold = particleRandom(state);
-      float population = particleRandom(state);
-
-      float activation;
-      vec2 radiusRange;
-      if (population < 0.7) {
-        activation = uGrainActivation.x;
-        radiusRange = vec2(0.5, 0.8);
-      } else if (population < 0.93) {
-        activation = uGrainActivation.y;
-        radiusRange = vec2(0.9, 1.4);
-      } else {
-        activation = uGrainActivation.z;
-        radiusRange = vec2(1.5, 2.25);
-      }
-      if (activationThreshold > activation) continue;
-
-      float radiusRandomA = particleRandom(state);
-      float radiusRandomB = particleRandom(state);
-      float radiusMix = sqrt(radiusRandomA * radiusRandomB);
-      float radius = mix(radiusRange.x, radiusRange.y, radiusMix);
-      vec2 center = (vec2(cell) + centerOffset) * uGrainCellSize;
-      float feather = max(radius * 0.22, uGrainCoordinateScale * 0.45);
-      float coverage = 1.0 - smoothstep(
-        max(0.0, radius - feather),
-        radius + feather,
-        distance(point, center)
-      );
-      if (coverage <= 0.0) continue;
-
-      float polarity = particleRandom(state) < 0.5 ? -1.0 : 1.0;
-      float localIntensity = 0.72 + 0.56 * particleRandom(state);
-      textureValue += polarity * localIntensity * coverage;
-    }
-  }
-
-  return textureValue;
+float correlatedExcitation(vec2 point, float scale, uint seed) {
+  vec2 scaled = point / scale;
+  ivec2 origin = ivec2(floor(scaled));
+  vec2 blend = smoothstep(vec2(0.0), vec2(1.0), fract(scaled));
+  float top = mix(
+    grainLatticeValue(origin, seed),
+    grainLatticeValue(origin + ivec2(1, 0), seed),
+    blend.x
+  );
+  float bottom = mix(
+    grainLatticeValue(origin + ivec2(0, 1), seed),
+    grainLatticeValue(origin + ivec2(1, 1), seed),
+    blend.x
+  );
+  return mix(top, bottom, blend.y);
 }
 
-vec3 applyGrain(vec3 rgb, vec2 point) {
-  if (uGrainContrast == 0.0) return rgb;
+float correlatedGrainField(vec2 point) {
+  float first = correlatedExcitation(point, uGrainPrimaryScale, uSeed);
+  vec2 rotated = vec2(
+    0.70710678 * (point.x - point.y) + 19.37,
+    0.70710678 * (point.x + point.y) - 7.91
+  );
+  float second = correlatedExcitation(
+    rotated,
+    uGrainPrimaryScale,
+    uSeed ^ 0x9e3779b9u
+  );
+  float mixed = 0.78 * first + 0.52 * second;
+  float localRoughness = 1.0 + uGrainRoughness * 0.65 * abs(first - second);
+  return clamp(mixed * localRoughness, -1.8, 1.8);
+}
 
-  float textureValue = particleField((point + 0.5) * uGrainCoordinateScale);
+vec3 applyGrain(vec3 rgb, vec2 point, vec2 uv, vec3 sourceRgb) {
+  if (uGrainVariance == 0.0) return rgb;
+
+  float textureValue = correlatedGrainField((point + 0.5) * uGrainCoordinateScale);
   float luminance = clamp01(dot(rgb, vec3(0.2126, 0.7152, 0.0722)));
-  float edgeVisibility = mix(0.65, 0.7, luminance);
-  float midtone = 4.0 * luminance * (1.0 - luminance);
-  float visibility = edgeVisibility + (1.0 - edgeVisibility) * midtone * midtone;
+  float exposureResponse = sqrt(0.58 + 0.42 * clamp01(4.0 * luminance * (1.0 - luminance)));
   float perceptualLuminance = linearToSrgb(vec3(luminance)).r;
+  vec2 texel = 1.0 / vec2(uImageSize);
+  float sourceCenter = dot(sourceRgb, vec3(0.2126, 0.7152, 0.0722));
+  float sourceNeighbors = (
+    dot(texture(uSource, uv - vec2(texel.x, 0.0)).rgb, vec3(0.2126, 0.7152, 0.0722))
+    + dot(texture(uSource, uv + vec2(texel.x, 0.0)).rgb, vec3(0.2126, 0.7152, 0.0722))
+    + dot(texture(uSource, uv - vec2(0.0, texel.y)).rgb, vec3(0.2126, 0.7152, 0.0722))
+    + dot(texture(uSource, uv + vec2(0.0, texel.y)).rgb, vec3(0.2126, 0.7152, 0.0722))
+  ) * 0.25;
+  float microDetail = sourceCenter - sourceNeighbors;
+  float absoluteDetail = abs(microDetail);
+  float integrationWeight = 1.0 - smoothstep(0.035, 0.18, absoluteDetail);
+  float edgeWeight = smoothstep(0.05, 0.18, absoluteDetail)
+    * (1.0 - smoothstep(0.3, 0.55, absoluteDetail));
   float targetLuminance = clamp01(
-    perceptualLuminance + textureValue * uGrainContrast * visibility
+    perceptualLuminance
+      + textureValue * uGrainVariance * exposureResponse
+      - microDetail * uGrainDetailCoupling * integrationWeight
+      + microDetail * uGrainAcutanceRecovery * edgeWeight
   );
   float linearTarget = srgbToLinear(vec3(targetLuminance)).r;
   return rgb + vec3(linearTarget - luminance);
@@ -281,7 +277,7 @@ void main() {
   rgb = applyExposure(rgb);
   rgb = applyColor(rgb);
   vec2 pixel = floor(vUv * vec2(uImageSize));
-  rgb = applyGrain(rgb, pixel);
+  rgb = applyGrain(rgb, pixel, vUv, source.rgb);
   outColor = vec4(linearToSrgb(rgb), source.a);
 }
 `;
@@ -374,9 +370,11 @@ class GpuPreviewRenderer {
       colorBoost: location(gl, this.program, "uColorBoost"),
       colorFade: location(gl, this.program, "uColorFade"),
       grainCoordinateScale: location(gl, this.program, "uGrainCoordinateScale"),
-      grainCellSize: location(gl, this.program, "uGrainCellSize"),
-      grainContrast: location(gl, this.program, "uGrainContrast"),
-      grainActivation: location(gl, this.program, "uGrainActivation"),
+      grainPrimaryScale: location(gl, this.program, "uGrainPrimaryScale"),
+      grainVariance: location(gl, this.program, "uGrainVariance"),
+      grainRoughness: location(gl, this.program, "uGrainRoughness"),
+      grainDetailCoupling: location(gl, this.program, "uGrainDetailCoupling"),
+      grainAcutanceRecovery: location(gl, this.program, "uGrainAcutanceRecovery"),
       seed: location(gl, this.program, "uSeed"),
       imageSize: location(gl, this.program, "uImageSize"),
     };
@@ -499,14 +497,11 @@ class GpuPreviewRenderer {
       this.canvas.height,
     );
     gl.uniform1f(this.uniforms.grainCoordinateScale, grain.coordinateScale);
-    gl.uniform1f(this.uniforms.grainCellSize, grain.cellSize);
-    gl.uniform1f(this.uniforms.grainContrast, grain.contrast);
-    gl.uniform3f(
-      this.uniforms.grainActivation,
-      grain.fineActivation,
-      grain.mediumActivation,
-      grain.coarseActivation,
-    );
+    gl.uniform1f(this.uniforms.grainPrimaryScale, grain.primaryScale);
+    gl.uniform1f(this.uniforms.grainVariance, grain.variance);
+    gl.uniform1f(this.uniforms.grainRoughness, grain.roughness);
+    gl.uniform1f(this.uniforms.grainDetailCoupling, grain.detailCoupling);
+    gl.uniform1f(this.uniforms.grainAcutanceRecovery, grain.acutanceRecovery);
     gl.uniform1ui(this.uniforms.seed, seed >>> 0);
     gl.uniform2i(this.uniforms.imageSize, this.canvas.width, this.canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 6);

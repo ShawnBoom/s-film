@@ -1,7 +1,7 @@
 import { createGpuPreviewRenderer } from "./gpu-preview.js?v=52";
 import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=52";
 import { createExportProcessor } from "./export-processor.js?v=52";
-import { hashSeed, processPixels } from "./image-engine.js?v=52";
+import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=52";
 import { loadFilterLut } from "./lut-loader.js?v=52";
 import { hasEdits, visibleEditLabel } from "./edit-state.js?v=52";
 
@@ -148,6 +148,11 @@ function updateDiagnosticOverlay() {
   const size = state.sourceData
     ? state.sourceData.width + " × " + state.sourceData.height
     : "—";
+  const grainParameters = getGrainParameters(
+    edit.grain,
+    state.sourceData?.width ?? 1,
+    state.sourceData?.height ?? 1,
+  );
   const filterActive = Boolean(edit.filter && edit.strength > 0);
   const exportTiming = diagnostics.exportTiming;
   const exportProcessorLabel = exportTiming.processor === "gpu"
@@ -191,8 +196,11 @@ function updateDiagnosticOverlay() {
     "Grain: " + edit.grain,
     "Light v2: " + (edit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (edit.color === 0 ? "off" : "active"),
-    "Grain engine: v3 particle " + (edit.grain === 0 ? "(off)" : "(active)"),
+    "Grain engine: v4 correlated " + (edit.grain === 0 ? "(off)" : "(active)"),
     "Reference grain scale: 960 px long edge",
+    "Correlation radius: " + grainParameters.correlationRadius.toFixed(2) + " ref px",
+    "Roughness: " + grainParameters.roughness.toFixed(3),
+    "Detail coupling: " + grainParameters.detailCoupling.toFixed(3),
     "grainSeed: " + (photo ? photo.grainSeed : "—"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback ? ["GPU fallback: " + exportTiming.gpuFallback] : []),

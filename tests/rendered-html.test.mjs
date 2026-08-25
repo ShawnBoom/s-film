@@ -92,7 +92,8 @@ test("keeps photo processing local, independent per photo, and batch-capable", a
   assert.match(page, /0\.95/);
   assert.match(engine, /linearRgbToOklab/);
   assert.match(engine, /applyExposure/);
-  assert.match(engine, /particleCellState/);
+  assert.match(engine, /sampleCorrelatedGrainField/);
+  assert.doesNotMatch(engine, /particleField|finePopulation|mediumPopulation|coarsePopulation/);
   assert.doesNotMatch(engine, /valueNoise|clusterScale|scanned.*grain/i);
   assert.match(engine, /strength === 0/);
   assert.match(staticApp, /edit:\s*createNeutralEdit\(\)/);
@@ -349,10 +350,15 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(gpuPreview, /uniform float uColorBoost/);
   assert.match(gpuPreview, /uniform float uColorFade/);
   assert.match(gpuPreview, /uniform float uGrainCoordinateScale/);
-  assert.match(gpuPreview, /uniform float uGrainCellSize/);
-  assert.match(gpuPreview, /uniform float uGrainContrast/);
-  assert.match(gpuPreview, /uniform vec3 uGrainActivation/);
-  assert.match(gpuPreview, /float particleField/);
+  assert.match(gpuPreview, /uniform float uGrainPrimaryScale/);
+  assert.match(gpuPreview, /uniform float uGrainVariance/);
+  assert.match(gpuPreview, /uniform float uGrainRoughness/);
+  assert.match(gpuPreview, /uniform float uGrainDetailCoupling/);
+  assert.match(gpuPreview, /uniform float uGrainAcutanceRecovery/);
+  assert.match(gpuPreview, /float correlatedGrainField/);
+  assert.match(gpuPreview, /float exposureResponse = sqrt\(0\.58 \+ 0\.42/);
+  assert.match(gpuPreview, /float microDetail = sourceCenter - sourceNeighbors/);
+  assert.doesNotMatch(gpuPreview, /particleField|uGrainActivation/);
   assert.doesNotMatch(gpuPreview, /valueNoise|uGrainScales|uGrainClusterStrength/);
   assert.doesNotMatch(gpuPreview, /chromaAmount|chromaA|chromaB/);
   assert.match(engine, /export function getFilterLut/);
@@ -360,11 +366,29 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(engine, /export function getColorParameters/);
   assert.match(engine, /export function getGrainParameters/);
   assert.match(engine, /960 \/ Math\.max\(1, width, height\)/);
-  assert.match(engine, /engine: "v3-particle"/);
-  assert.match(engine, /fineRadiusMin: 0\.5/);
-  assert.match(engine, /mediumRadiusMin: 0\.9/);
-  assert.match(engine, /coarseRadiusMax: 2\.25/);
+  assert.match(engine, /engine: "v4-correlated"/);
+  assert.match(engine, /primaryScale: 3\.6/);
+  assert.match(engine, /correlationRadius: 3\.6/);
+  assert.match(engine, /variance: 0\.12/);
+  assert.match(engine, /roughness: 0\.1 \+ 0\.45/);
+  assert.match(engine, /detailCoupling: 0\.09/);
+  assert.match(engine, /acutanceRecovery: 0\.007/);
   assert.doesNotMatch(engine, /chromaAmount|chromaA|chromaB/);
+
+  for (const sharedConstant of [
+    "0.70710678",
+    "19.37",
+    "7.91",
+    "0x9e3779b9",
+    "0.78",
+    "0.52",
+    "0.65",
+    "0.58",
+    "0.42",
+  ]) {
+    assert.ok(engine.includes(sharedConstant), `CPU grain is missing ${sharedConstant}`);
+    assert.ok(gpuPreview.includes(sharedConstant), `GPU grain is missing ${sharedConstant}`);
+  }
   assert.match(page, /function createSessionGrainSeed/);
   assert.match(page, /crypto\?\.getRandomValues/);
   assert.match(staticApp, /grainSeed: createSessionGrainSeed\(file, id\)/);
@@ -411,8 +435,11 @@ test("shows actual preview and production export diagnostics only for debug quer
   assert.match(staticApp, /GPU fallback:/);
   assert.match(staticApp, /Light v2:/);
   assert.match(staticApp, /Color v2\.1:/);
-  assert.match(staticApp, /Grain engine: v3 particle/);
+  assert.match(staticApp, /Grain engine: v4 correlated/);
   assert.match(staticApp, /Reference grain scale: 960 px long edge/);
+  assert.match(staticApp, /Correlation radius:/);
+  assert.match(staticApp, /Roughness:/);
+  assert.match(staticApp, /Detail coupling:/);
   assert.match(staticApp, /grainSeed:/);
   assert.match(staticApp, /Worker processPixels/);
   assert.match(staticApp, /Main-thread processPixels/);

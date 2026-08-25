@@ -188,38 +188,30 @@ test("Color v2.1 reaches perceptual grayscale at -100", () => {
   }
 });
 
-test("Grain v3 maps the slider to stable particle density, contrast, and population activation", () => {
+test("Grain v4 maps the slider to variance, microscopic correlation, roughness, and detail coupling", () => {
   const values = [15, 25, 50, 75, 100].map((grain) =>
     getGrainParameters(grain, 4032, 3024));
   for (let index = 1; index < values.length; index += 1) {
-    assert.ok(values[index].contrast > values[index - 1].contrast);
-    assert.ok(values[index].fineActivation > values[index - 1].fineActivation);
-    assert.ok(values[index].mediumActivation > values[index - 1].mediumActivation);
-    assert.ok(values[index].coarseActivation >= values[index - 1].coarseActivation);
-    assert.equal(values[index].cellSize, values[0].cellSize);
+    assert.ok(values[index].variance > values[index - 1].variance);
+    assert.equal(values[index].correlationRadius, values[index - 1].correlationRadius);
+    assert.ok(values[index].roughness > values[index - 1].roughness);
+    assert.ok(values[index].detailCoupling > values[index - 1].detailCoupling);
+    assert.ok(values[index].acutanceRecovery > values[index - 1].acutanceRecovery);
+    assert.equal(values[index].primaryScale, values[0].primaryScale);
     assert.equal(values[index].coordinateScale, values[0].coordinateScale);
   }
-  assert.equal(values[0].engine, "v3-particle");
+  assert.equal(values[0].engine, "v4-correlated");
   assert.equal(values[0].referenceLongEdge, 960);
-  assert.equal(values[0].finePopulation, 0.7);
-  assert.equal(values[0].mediumPopulation, 0.23);
-  assert.equal(values[0].coarsePopulation, 0.07);
-  assert.equal(values[0].fineRadiusMin * 2, 1);
-  assert.equal(values[0].fineRadiusMax * 2, 1.6);
-  assert.equal(values[0].mediumRadiusMin * 2, 1.8);
-  assert.equal(values[0].mediumRadiusMax * 2, 2.8);
-  assert.equal(values[0].coarseRadiusMin * 2, 3);
-  assert.equal(values[0].coarseRadiusMax * 2, 4.5);
-  assert.ok(values[0].mediumActivation < values[0].fineActivation * 0.02);
-  assert.ok(values[2].mediumActivation > values[2].fineActivation * 0.6);
-  assert.ok(values[2].coarseActivation < values[2].fineActivation * 0.1);
-  assert.ok(values[4].coarseActivation > values[4].fineActivation * 0.99);
+  assert.equal(values[0].primaryScale, 3.6);
+  assert.equal(values[0].correlationRadius, 3.6);
   const disabled = getGrainParameters(0, 4032, 3024);
   assert.equal(disabled.active, false);
-  assert.equal(disabled.contrast, 0);
+  assert.equal(disabled.variance, 0);
+  assert.equal(disabled.detailCoupling, 0);
+  assert.equal(disabled.acutanceRecovery, 0);
 });
 
-test("Grain v3 is luminance-only and approximately zero-mean", () => {
+test("Grain v4 is luminance-only and approximately zero-mean", () => {
   const width = 128;
   const height = 128;
   const gray = new Uint8ClampedArray(width * height * 4);
@@ -243,19 +235,62 @@ test("Grain v3 is luminance-only and approximately zero-mean", () => {
   assert.ok(Math.abs(total / (width * height) - 128) < 1);
 });
 
-test("Grain v3 keeps particle geometry isotropic and resolution-independent", () => {
+test("Grain v4 keeps its correlation geometry isotropic and resolution-independent", () => {
   const preview = getGrainParameters(50, 540, 960);
   const exportSize = getGrainParameters(50, 2268, 4032);
+  const landscape = getGrainParameters(50, 960, 540);
   assert.equal(preview.coordinateScale, 1);
   assert.equal(exportSize.coordinateScale, 960 / 4032);
-  assert.equal(preview.fineRadiusMin, exportSize.fineRadiusMin);
-  assert.equal(preview.coarseRadiusMax, exportSize.coarseRadiusMax);
-  const exportFineDiameterPixels = (exportSize.fineRadiusMin * 2) / exportSize.coordinateScale;
-  const resizedFineDiameter = exportFineDiameterPixels * (960 / 4032);
-  const exportCoarseDiameterPixels = (exportSize.coarseRadiusMax * 2) / exportSize.coordinateScale;
-  const resizedCoarseDiameter = exportCoarseDiameterPixels * (960 / 4032);
-  assert.ok(Math.abs(resizedFineDiameter - preview.fineRadiusMin * 2) < 1e-12);
-  assert.ok(Math.abs(resizedCoarseDiameter - preview.coarseRadiusMax * 2) < 1e-12);
+  assert.equal(preview.primaryScale, exportSize.primaryScale);
+  assert.equal(preview.correlationRadius, exportSize.correlationRadius);
+  assert.equal(preview.correlationRadius, landscape.correlationRadius);
+  const exportDiameterPixels = (exportSize.correlationRadius * 2) / exportSize.coordinateScale;
+  const resizedDiameter = exportDiameterPixels * (960 / 4032);
+  assert.ok(Math.abs(resizedDiameter - preview.correlationRadius * 2) < 1e-12);
+});
+
+test("Grain v4 produces short-range correlated, statistically isotropic texture", () => {
+  const width = 960;
+  const height = 192;
+  const gray = new Uint8ClampedArray(width * height * 4);
+  for (let offset = 0; offset < gray.length; offset += 4) {
+    gray[offset] = 128;
+    gray[offset + 1] = 128;
+    gray[offset + 2] = 128;
+    gray[offset + 3] = 255;
+  }
+  const result = processPixels(
+    { width, height, data: gray },
+    { filter: null, strength: 100, brightness: 0, color: 0, grain: 50 },
+    77881,
+  );
+  const values = new Float64Array(width * height);
+  let mean = 0;
+  for (let pixel = 0; pixel < values.length; pixel += 1) {
+    values[pixel] = result[pixel * 4] - 128;
+    mean += values[pixel];
+  }
+  mean /= values.length;
+  let variance = 0;
+  let horizontal = 0;
+  let vertical = 0;
+  let neighborCount = 0;
+  for (let y = 0; y < height - 1; y += 1) {
+    for (let x = 0; x < width - 1; x += 1) {
+      const index = y * width + x;
+      const centered = values[index] - mean;
+      variance += centered * centered;
+      horizontal += centered * (values[index + 1] - mean);
+      vertical += centered * (values[index + width] - mean);
+      neighborCount += 1;
+    }
+  }
+  variance /= neighborCount;
+  const horizontalCorrelation = horizontal / neighborCount / variance;
+  const verticalCorrelation = vertical / neighborCount / variance;
+  assert.ok(horizontalCorrelation > 0.35 && horizontalCorrelation < 0.9);
+  assert.ok(verticalCorrelation > 0.35 && verticalCorrelation < 0.9);
+  assert.ok(Math.abs(horizontalCorrelation - verticalCorrelation) < 0.08);
 });
 
 test("preset strength zero restores the exact original", () => {
@@ -599,7 +634,7 @@ test("brightness and perceptual color controls respond across their full ranges"
   }
 });
 
-test("Grain v3 is neutral at zero and stable for a photo instance seed", () => {
+test("Grain v4 is neutral at zero, seed-stable, reversible, and random per import", () => {
   const edit = { filter: null, strength: 100, brightness: 0, color: 0, grain: 65 };
   const first = processPixels(source, edit, 123);
   const second = processPixels(source, edit, 123);
