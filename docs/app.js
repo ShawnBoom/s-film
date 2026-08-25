@@ -1,7 +1,8 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=45";
-import { createExportProcessor } from "./export-processor.js?v=45";
-import { hashSeed, processPixels } from "./image-engine.js?v=45";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=45";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=46";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=46";
+import { createExportProcessor } from "./export-processor.js?v=46";
+import { hashSeed, processPixels } from "./image-engine.js?v=46";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=46";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -13,7 +14,6 @@ const state = {
   activeAdjustment: "brightness",
   showOriginal: false,
   busy: false,
-  benchmarkBusy: false,
   sourceData: null,
   renderFrame: 0,
   loadToken: 0,
@@ -50,12 +50,12 @@ const diagnostics = {
     decode: null,
     drawRead: null,
     process: null,
-    processor: "worker",
+    processor: "not-run",
+    gpuFallback: "",
     put: null,
     jpeg: null,
     total: null,
   },
-  gpuExportLines: ["", "GPU EXPORT A/B", "Ready", "Add a photo, then tap Run GPU A/B."],
 };
 
 const gpuPreview = DEBUG_MODE
@@ -69,7 +69,7 @@ const gpuPreview = DEBUG_MODE
 const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
 const exportProcessor = createExportProcessor({
   createWorker: () => new Worker(
-    new URL("./export-worker.js?v=45", import.meta.url),
+    new URL("./export-worker.js?v=46", import.meta.url),
     { type: "module" },
   ),
   onFailure(error) {
@@ -86,14 +86,9 @@ function createDiagnosticOverlay() {
   overlay.dataset.previewDiagnostics = "true";
   overlay.setAttribute("aria-label", "Preview diagnostics");
   const output = document.createElement("pre");
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "gpu-benchmark-button";
-  button.textContent = "Run GPU A/B";
-  button.addEventListener("click", () => void runGpuExportBenchmark());
-  overlay.append(output, button);
+  overlay.append(output);
   document.querySelector(".editor-card")?.append(overlay);
-  return { root: overlay, output, button };
+  return { root: overlay, output };
 }
 
 function updateDiagnosticOverlay() {
@@ -112,12 +107,18 @@ function updateDiagnosticOverlay() {
     : "—";
   const filterActive = Boolean(edit.filter && edit.strength > 0);
   const exportTiming = diagnostics.exportTiming;
-  const exportProcessorLabel = exportProcessor.mode === "worker"
-    ? "Worker"
-    : "Main-thread fallback";
-  const exportProcessLabel = exportTiming.processor === "worker"
-    ? "Worker processPixels"
-    : "Main-thread processPixels";
+  const exportProcessorLabel = exportTiming.processor === "gpu"
+    ? "GPU"
+    : exportTiming.processor === "worker-fallback"
+      ? "Worker fallback"
+      : exportTiming.processor === "main-thread-fallback"
+        ? "Main-thread fallback"
+        : "Not run";
+  const exportProcessLabel = exportTiming.processor === "gpu"
+    ? "GPU full-resolution"
+    : exportTiming.processor === "worker-fallback"
+      ? "Worker processPixels"
+      : "Main-thread processPixels";
   const duration = (value) => value === null ? "—" : value.toFixed(1) + " ms";
 
   diagnosticOverlay.output.textContent = [
@@ -133,6 +134,7 @@ function updateDiagnosticOverlay() {
     "Color: " + edit.color,
     "Grain: " + edit.grain,
     "Export processor: " + exportProcessorLabel,
+    ...(exportTiming.gpuFallback ? ["GPU fallback: " + exportTiming.gpuFallback] : []),
     ...(diagnostics.exportError ? ["Export Worker failed: " + diagnostics.exportError] : []),
     "Export photo: " + exportTiming.photo,
     "Decode: " + duration(exportTiming.decode),
@@ -141,51 +143,7 @@ function updateDiagnosticOverlay() {
     "putImageData: " + duration(exportTiming.put),
     "JPEG encoding: " + duration(exportTiming.jpeg),
     "File ready: " + duration(exportTiming.total),
-    ...diagnostics.gpuExportLines,
   ].join("\n");
-  diagnosticOverlay.button.disabled = !photo || state.busy || state.benchmarkBusy;
-  diagnosticOverlay.button.textContent = state.benchmarkBusy ? "Testing…" : "Run GPU A/B";
-}
-
-async function runGpuExportBenchmark() {
-  const photo = currentPhoto();
-  if (!DEBUG_MODE || !photo || state.busy || state.benchmarkBusy) return;
-  state.benchmarkBusy = true;
-  diagnostics.gpuExportLines = ["", "GPU EXPORT A/B", "Loading benchmark…"];
-  renderControls();
-  updateDiagnosticOverlay();
-
-  try {
-    const benchmark = await import("./gpu-export-benchmark.js?v=45");
-    const snapshot = {
-      url: photo.url,
-      edit: { ...photo.edit },
-      grainSeed: photo.grainSeed,
-    };
-    const result = await benchmark.runGpuExportABBenchmark({
-      photo: snapshot,
-      filterIds: elements.filters.map((button) => button.dataset.filter),
-      exportProcessor,
-      onProgress(progress) {
-        diagnostics.gpuExportLines = benchmark.formatGpuExportBenchmark(
-          progress.result ?? null,
-          progress.message,
-        );
-        updateDiagnosticOverlay();
-      },
-    });
-    diagnostics.gpuExportLines = benchmark.formatGpuExportBenchmark(result, "Complete");
-  } catch (error) {
-    diagnostics.gpuExportLines = [
-      "",
-      "GPU EXPORT A/B",
-      "Failed: " + (error instanceof Error ? error.message : String(error)),
-    ];
-  } finally {
-    state.benchmarkBusy = false;
-    renderControls();
-    updateDiagnosticOverlay();
-  }
 }
 
 function updateExportDiagnostics(patch) {
@@ -351,7 +309,7 @@ function renderControls() {
   elements.deleteButton.hidden = !photo;
   elements.photoCount.hidden = !photo;
   elements.photoCount.textContent = photo ? state.activeIndex + 1 + " / " + state.photos.length : "";
-  elements.exportButton.disabled = !photo || state.busy || state.benchmarkBusy;
+  elements.exportButton.disabled = !photo || state.busy;
   elements.exportButton.textContent = state.busy ? "Saving…" : "Save";
   elements.exportButton.setAttribute("aria-busy", String(state.busy));
   elements.applyAll.disabled = state.photos.length < 2;
@@ -541,14 +499,15 @@ async function processPhoto(photo, index, total) {
     decode: null,
     drawRead: null,
     process: null,
-    processor: exportProcessor.mode,
+    processor: "not-run",
+    gpuFallback: "",
     put: null,
     jpeg: null,
     total: null,
   });
 
   const decodeStartedAt = performance.now();
-  const image = await loadImage(photo.url);
+  let image = await loadImage(photo.url);
   updateExportDiagnostics({ decode: performance.now() - decodeStartedAt });
 
   const drawStartedAt = performance.now();
@@ -558,33 +517,52 @@ async function processPhoto(photo, index, total) {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("当前浏览器无法处理照片");
   context.drawImage(image, 0, 0);
+  image = null;
   let source = context.getImageData(0, 0, canvas.width, canvas.height);
   let drawReadDuration = performance.now() - drawStartedAt;
   updateExportDiagnostics({ drawRead: drawReadDuration });
 
   let processed;
-  try {
-    processed = await exportProcessor.process(source, photo.edit, photo.grainSeed);
-  } catch {
-    const fallbackReadStartedAt = performance.now();
-    source = context.getImageData(0, 0, canvas.width, canvas.height);
-    drawReadDuration += performance.now() - fallbackReadStartedAt;
-    const fallbackStartedAt = performance.now();
-    processed = {
-      pixels: processPixels(source, photo.edit, photo.grainSeed),
-      processor: "main-thread",
-      duration: performance.now() - fallbackStartedAt,
-    };
+  let processMode;
+  let gpuFallback = "";
+  let gpuAttempt = await attemptGpuFullResolutionExport(
+    source,
+    photo.edit,
+    photo.grainSeed,
+  );
+  if (gpuAttempt.ok) {
+    processed = { pixels: gpuAttempt.pixels, duration: gpuAttempt.duration };
+    processMode = "gpu";
+  } else {
+    gpuFallback = gpuAttempt.reason;
+    try {
+      const cpuResult = await exportProcessor.process(source, photo.edit, photo.grainSeed);
+      processed = cpuResult;
+      processMode = cpuResult.processor === "worker"
+        ? "worker-fallback"
+        : "main-thread-fallback";
+    } catch {
+      const fallbackReadStartedAt = performance.now();
+      source = context.getImageData(0, 0, canvas.width, canvas.height);
+      drawReadDuration += performance.now() - fallbackReadStartedAt;
+      const fallbackStartedAt = performance.now();
+      processed = {
+        pixels: processPixels(source, photo.edit, photo.grainSeed),
+        duration: performance.now() - fallbackStartedAt,
+      };
+      processMode = "main-thread-fallback";
+    }
   }
+  gpuAttempt = null;
   let pixels = processed.pixels;
   const processDuration = processed.duration;
-  const processMode = processed.processor;
   processed = null;
   source = null;
   updateExportDiagnostics({
     drawRead: drawReadDuration,
     process: processDuration,
     processor: processMode,
+    gpuFallback,
   });
 
   const putStartedAt = performance.now();
@@ -788,7 +766,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=45", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=46", { scope: "./" }).catch(() => {});
   });
 }
 

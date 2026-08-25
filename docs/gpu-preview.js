@@ -1,4 +1,4 @@
-import { getFilterLut } from "./image-engine.js?v=45";
+import { getFilterLut } from "./image-engine.js?v=46";
 
 const VERTEX_SHADER = `#version 300 es
 in vec2 aPosition;
@@ -465,7 +465,7 @@ function flipRowsInPlace(pixels, width, height) {
   }
 }
 
-async function waitForGpu(gl) {
+async function waitForGpu(gl, isContextLost = () => gl.isContextLost()) {
   const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (!sync) {
     const startedAt = performance.now();
@@ -477,7 +477,7 @@ async function waitForGpu(gl) {
   gl.flush();
   try {
     while (true) {
-      if (gl.isContextLost()) throw new Error("GPU export context was lost");
+      if (isContextLost()) throw new Error("WebGL context lost");
       const status = gl.clientWaitSync(sync, 0, 0);
       if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
         return performance.now() - startedAt;
@@ -493,14 +493,28 @@ async function waitForGpu(gl) {
   }
 }
 
-class GpuExportBenchmarkRenderer extends GpuPreviewRenderer {
+class GpuFullResolutionRenderer extends GpuPreviewRenderer {
   constructor(canvas) {
     super(canvas, { premultipliedAlpha: false });
+    const { gl } = this;
+    this.framebuffer = gl.createFramebuffer();
+    this.renderTargetTexture = gl.createTexture();
+    this.contextLost = false;
+    this.handleContextLost = (event) => {
+      event.preventDefault?.();
+      this.contextLost = true;
+    };
+    canvas.addEventListener?.("webglcontextlost", this.handleContextLost, false);
+    if (!this.framebuffer || !this.renderTargetTexture) {
+      throw new Error("Unable to allocate GPU export render target");
+    }
   }
 
   assertNoError(stage) {
+    if (this.contextLost || this.gl.isContextLost()) throw new Error("WebGL context lost");
     const error = this.gl.getError();
-    if (error !== this.gl.NO_ERROR) throw new Error(`${stage} WebGL error: 0x${error.toString(16)}`);
+    if (error === this.gl.OUT_OF_MEMORY) throw new Error(`${stage}: WebGL out of memory`);
+    if (error !== this.gl.NO_ERROR) throw new Error(`${stage}: WebGL error 0x${error.toString(16)}`);
   }
 
   capabilities(width, height) {
@@ -531,6 +545,41 @@ class GpuExportBenchmarkRenderer extends GpuPreviewRenderer {
     });
   }
 
+  createRenderTarget(width, height) {
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.renderTargetTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA8,
+      width,
+      height,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      null,
+    );
+    this.assertNoError("Render target allocation");
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      this.renderTargetTexture,
+      0,
+    );
+    this.assertNoError("Framebuffer attachment");
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error(`Framebuffer incomplete: 0x${status.toString(16)}`);
+    }
+  }
+
   async renderPixels(source, edit, seed) {
     const totalStartedAt = performance.now();
 
@@ -545,11 +594,17 @@ class GpuExportBenchmarkRenderer extends GpuPreviewRenderer {
     const lut = performance.now() - lutStartedAt;
     if (edit.filter && !hasLut) throw new Error(`GPU export LUT is unavailable: ${edit.filter}`);
 
+    this.createRenderTarget(source.width, source.height);
+    this.gl.viewport(0, 0, source.width, source.height);
+
     const submissionStartedAt = performance.now();
     this.render(edit, seed, false);
     this.assertNoError("Draw submission");
     const submission = performance.now() - submissionStartedAt;
-    const completion = await waitForGpu(this.gl);
+    const completion = await waitForGpu(
+      this.gl,
+      () => this.contextLost || this.gl.isContextLost(),
+    );
 
     const readPixelsStartedAt = performance.now();
     const bytes = new Uint8ClampedArray(source.width * source.height * 4);
@@ -584,6 +639,19 @@ class GpuExportBenchmarkRenderer extends GpuPreviewRenderer {
       },
     };
   }
+
+  destroy() {
+    const { gl } = this;
+    this.canvas.removeEventListener?.("webglcontextlost", this.handleContextLost, false);
+    if (!gl.isContextLost()) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteFramebuffer(this.framebuffer);
+      gl.deleteTexture(this.renderTargetTexture);
+    }
+    super.destroy();
+    this.canvas.width = 1;
+    this.canvas.height = 1;
+  }
 }
 
 export function createGpuPreviewRenderer(canvas, options = {}) {
@@ -609,9 +677,13 @@ export function createGpuExportBenchmarkRenderer(options = {}) {
   const onError = typeof options.onError === "function" ? options.onError : null;
   try {
     const canvas = document.createElement("canvas");
-    return new GpuExportBenchmarkRenderer(canvas);
+    return new GpuFullResolutionRenderer(canvas);
   } catch (error) {
     onError?.(error);
     return null;
   }
+}
+
+export function createGpuFullResolutionRenderer(options = {}) {
+  return createGpuExportBenchmarkRenderer(options);
 }
