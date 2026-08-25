@@ -188,7 +188,7 @@ test("Color v2.1 reaches perceptual grayscale at -100", () => {
   }
 });
 
-test("Grain v2.1 keeps layer frequencies anchored while evolving their contribution", () => {
+test("Grain v2.2 keeps layer frequencies anchored while strengthening amplitude and mid/coarse participation", () => {
   const values = [15, 25, 50, 75, 100].map((grain) =>
     getGrainParameters(grain, 4032, 3024));
   for (let index = 1; index < values.length; index += 1) {
@@ -202,11 +202,19 @@ test("Grain v2.1 keeps layer frequencies anchored while evolving their contribut
   }
   assert.ok(values[4].fineWeight > values[4].mediumWeight);
   assert.ok(values[4].mediumWeight > values[4].coarseWeight);
+  assert.ok(Math.abs(values[0].amplitude - 0.18 * 0.15 ** 1.08) < 1e-12);
+  assert.ok(Math.abs(values[1].amplitude - 0.18 * 0.25 ** 1.08) < 1e-12);
+  assert.ok(Math.abs(values[2].amplitude - 0.18 * 0.5 ** 1.08) < 1e-12);
+  assert.ok(Math.abs(values[3].amplitude - 0.18 * 0.75 ** 1.08) < 1e-12);
+  assert.equal(values[4].amplitude, 0.18);
+  assert.equal(values[4].fineWeight, 0.64);
+  assert.equal(values[4].mediumWeight, 0.27);
+  assert.ok(Math.abs(values[4].coarseWeight - 0.09) < 1e-12);
   assert.ok(values[4].clusterStrength <= 0.025);
   assert.equal(getGrainParameters(0, 4032, 3024).active, false);
 });
 
-test("Grain v2.1 is luminance-only and approximately zero-mean", () => {
+test("Grain v2.2 is luminance-only and approximately zero-mean", () => {
   const width = 128;
   const height = 128;
   const gray = new Uint8ClampedArray(width * height * 4);
@@ -230,7 +238,7 @@ test("Grain v2.1 is luminance-only and approximately zero-mean", () => {
   assert.ok(Math.abs(total / (width * height) - 128) < 1);
 });
 
-test("Grain v2.1 uses resolution-independent isotropic coordinates", () => {
+test("Grain v2.2 uses resolution-independent isotropic coordinates", () => {
   function uniformGray(width, height) {
     const data = new Uint8ClampedArray(width * height * 4);
     for (let offset = 0; offset < data.length; offset += 4) {
@@ -595,7 +603,7 @@ test("brightness and perceptual color controls respond across their full ranges"
   }
 });
 
-test("Grain v2.1 is neutral at zero and stable for a photo instance seed", () => {
+test("Grain v2.2 is neutral at zero and stable for a photo instance seed", () => {
   const edit = { filter: null, strength: 100, brightness: 0, color: 0, grain: 65 };
   const first = processPixels(source, edit, 123);
   const second = processPixels(source, edit, 123);
