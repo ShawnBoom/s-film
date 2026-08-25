@@ -170,6 +170,8 @@ export default function Home() {
   const [status, setStatus] = useState("等待添加照片");
   const [toast, setToast] = useState("");
   const [adjustmentDraft, setAdjustmentDraft] = useState("0");
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugVersion, setDebugVersion] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -179,6 +181,12 @@ export default function Home() {
   const renderFrameRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const photosRef = useRef<PhotoItem[]>([]);
+  const diagnosticsRef = useRef({
+    initError: "",
+    lastPath: "" as "" | "gpu" | "cpu",
+    lastDuration: null as number | null,
+    samples: { gpu: [] as number[], cpu: [] as number[] },
+  });
 
   const currentPhoto = photos[activeIndex] ?? null;
   const currentEdit = currentPhoto?.edit ?? createNeutralEdit();
@@ -186,6 +194,10 @@ export default function Home() {
   const currentVisibleLabel = visibleEditLabel(currentEdit, showOriginal);
   const currentPhotoId = currentPhoto?.id ?? "";
   const sourceUrl = currentPhoto?.url ?? "";
+
+  useEffect(() => {
+    setDebugMode(new URLSearchParams(window.location.search).get("debug") === "1");
+  }, []);
 
   const adjustmentConfig = useMemo(() => {
     if (activeAdjustment === "strength") {
@@ -267,7 +279,15 @@ export default function Home() {
 
         if (!gpuPreviewAttemptedRef.current) {
           gpuPreviewAttemptedRef.current = true;
-          gpuPreviewRef.current = createGpuPreviewRenderer(canvas);
+          gpuPreviewRef.current = debugMode
+            ? createGpuPreviewRenderer(canvas, {
+              onError({ stage, error }: { stage: string; error: unknown }) {
+                const message = (error instanceof Error ? error.message : String(error)).replace(/\0/g, "");
+                diagnosticsRef.current.initError = stage + ": " + message;
+                setDebugVersion((version) => version + 1);
+              },
+            })
+            : createGpuPreviewRenderer(canvas);
         }
         if (gpuPreviewRef.current) {
           gpuPreviewRef.current.setSource(sourceData);
@@ -286,6 +306,7 @@ export default function Home() {
           ),
         );
         setSourceVersion((version) => version + 1);
+        if (debugMode) setDebugVersion((version) => version + 1);
         setStatus("照片已载入");
       } catch {
         if (!cancelled) setStatus("照片载入失败，请换一张照片");
@@ -305,20 +326,40 @@ export default function Home() {
       const source = sourceDataRef.current;
       if (!canvas || !source || !currentPhoto) return;
       if (gpuPreviewRef.current) {
+        const startedAt = debugMode ? performance.now() : 0;
         gpuPreviewRef.current.render(currentEdit, currentPhoto.grainSeed, showOriginal);
+        if (debugMode) {
+          const duration = performance.now() - startedAt;
+          const samples = diagnosticsRef.current.samples.gpu;
+          samples.push(duration);
+          if (samples.length > 10) samples.shift();
+          diagnosticsRef.current.lastPath = "gpu";
+          diagnosticsRef.current.lastDuration = duration;
+          setDebugVersion((version) => version + 1);
+        }
         return;
       }
       const context = canvas.getContext("2d");
       if (!context) return;
+      const startedAt = debugMode ? performance.now() : 0;
       const pixels = showOriginal
         ? new Uint8ClampedArray(source.data)
         : processPixels(source, currentEdit, currentPhoto.grainSeed);
       context.putImageData(new ImageData(pixels, source.width, source.height), 0, 0);
+      if (debugMode) {
+        const duration = performance.now() - startedAt;
+        const samples = diagnosticsRef.current.samples.cpu;
+        samples.push(duration);
+        if (samples.length > 10) samples.shift();
+        diagnosticsRef.current.lastPath = "cpu";
+        diagnosticsRef.current.lastDuration = duration;
+        setDebugVersion((version) => version + 1);
+      }
     });
     return () => {
       if (renderFrameRef.current) cancelAnimationFrame(renderFrameRef.current);
     };
-  }, [currentPhoto, currentEdit, showOriginal, sourceVersion]);
+  }, [currentPhoto, currentEdit, showOriginal, sourceVersion, debugMode]);
 
   function showToast(message: string) {
     setToast(message);
@@ -475,6 +516,36 @@ export default function Home() {
     }
   }
 
+  const diagnosticPath = gpuPreviewRef.current ? "gpu" : "cpu";
+  const diagnosticSamples = diagnosticsRef.current.samples[diagnosticPath];
+  const diagnosticAverage = diagnosticSamples.length
+    ? diagnosticSamples.reduce((sum, duration) => sum + duration, 0) / diagnosticSamples.length
+    : null;
+  const diagnosticTimingLabel = diagnosticPath === "gpu" ? "Submit" : "Render";
+  const diagnosticAverageLabel = diagnosticPath === "gpu" ? "Average submit" : "Average";
+  const diagnosticSource = sourceDataRef.current;
+  const diagnosticFilterActive = Boolean(currentEdit.filter && currentEdit.strength > 0);
+  const diagnosticText = [
+    "Preview: " + (diagnosticPath === "gpu" ? "WebGL2 GPU" : "CPU fallback"),
+    gpuPreviewRef.current
+      ? "GPU init: OK"
+      : "GPU init failed: " + (diagnosticsRef.current.initError || "Not initialized"),
+    diagnosticTimingLabel + ": "
+      + (diagnosticsRef.current.lastPath === diagnosticPath && diagnosticsRef.current.lastDuration !== null
+        ? diagnosticsRef.current.lastDuration.toFixed(1) + " ms"
+        : "—"),
+    diagnosticAverageLabel + ": "
+      + (diagnosticAverage === null ? "—" : diagnosticAverage.toFixed(1) + " ms"),
+    "Preview size: " + (diagnosticSource
+      ? diagnosticSource.width + " × " + diagnosticSource.height
+      : "—"),
+    "Filter: " + (diagnosticFilterActive ? "on" : "off"),
+    "Light: " + currentEdit.brightness,
+    "Color: " + currentEdit.color,
+    "Grain: " + currentEdit.grain,
+  ].join("\n");
+  void debugVersion;
+
   return (
     <main className="app-shell">
       <section className="editor-card interaction-surface" aria-label="See 照片滤镜">
@@ -485,6 +556,16 @@ export default function Home() {
             照片仅在本机处理
           </p>
         </header>
+
+        {debugMode && (
+          <aside
+            className="diagnostic-overlay"
+            data-preview-diagnostics="true"
+            aria-label="Preview diagnostics"
+          >
+            {diagnosticText}
+          </aside>
+        )}
 
         <section className={"photo-stage" + (currentPhoto ? " has-photo" : "")}>
           {!currentPhoto && (

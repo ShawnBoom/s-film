@@ -77,6 +77,26 @@ input:focus-visible {
   overflow: hidden;
 }
 
+.diagnostic-overlay {
+  position: absolute;
+  z-index: 10;
+  top: calc(env(safe-area-inset-top) + 44px);
+  left: 6px;
+  max-width: calc(100% - 12px);
+  padding: 6px 7px;
+  border: 0.5px solid rgba(243, 232, 204, 0.24);
+  border-radius: 3px;
+  background: rgba(17, 18, 16, 0.82);
+  color: var(--control-surface);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
 .topbar {
   display: flex;
   align-items: center;

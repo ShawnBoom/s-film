@@ -292,27 +292,27 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=39"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=39"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=39"/);
-  assert.match(staticWorker, /see-static-v39/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=39/);
-  assert.match(staticWorker, /image-engine\.js\?v=39/);
-  assert.match(staticWorker, /edit-state\.js\?v=39/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=39/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=39/);
-  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=39/);
-  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=39/);
-  assert.match(staticWorker, /s05-superia400-lut\.js\?v=39/);
-  assert.match(staticWorker, /s06-color100-lut\.js\?v=39/);
-  assert.match(staticWorker, /s07-color800z-lut\.js\?v=39/);
-  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=39/);
-  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=39/);
-  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=39/);
-  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=39/);
-  assert.match(staticWorker, /s12-portra400-lut\.js\?v=39/);
-  assert.match(staticWorker, /s13-gold200-lut\.js\?v=39/);
-  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=39/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=40"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=40"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=40"/);
+  assert.match(staticWorker, /see-static-v40/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=40/);
+  assert.match(staticWorker, /image-engine\.js\?v=40/);
+  assert.match(staticWorker, /edit-state\.js\?v=40/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=40/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=40/);
+  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=40/);
+  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=40/);
+  assert.match(staticWorker, /s05-superia400-lut\.js\?v=40/);
+  assert.match(staticWorker, /s06-color100-lut\.js\?v=40/);
+  assert.match(staticWorker, /s07-color800z-lut\.js\?v=40/);
+  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=40/);
+  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=40/);
+  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=40/);
+  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=40/);
+  assert.match(staticWorker, /s12-portra400-lut\.js\?v=40/);
+  assert.match(staticWorker, /s13-gold200-lut\.js\?v=40/);
+  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=40/);
   assert.match(staticWorker, /see-welcome\.png/);
   assert.match(appWorker, /see-v21/);
   assert.match(appWorker, /see-welcome\.png/);
@@ -341,4 +341,30 @@ test("uses a GPU live preview without changing the CPU export pipeline", async (
   const sliderUpdate = staticApp.match(/function updateAdjustmentValue\(value\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
   assert.match(sliderUpdate, /renderAdjustmentControls/);
   assert.doesNotMatch(sliderUpdate, /renderControls\(\)/);
+});
+
+test("shows preview diagnostics only for the temporary debug query mode", async () => {
+  const [page, staticHtml, staticApp, gpuPreview, staticStyles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../docs/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/gpu-preview.js", import.meta.url), "utf8"),
+    readFile(new URL("../docs/styles.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(staticApp, /URLSearchParams\(window\.location\.search\)\.get\("debug"\) === "1"/);
+  assert.match(staticApp, /DEBUG_MODE \? createDiagnosticOverlay\(\) : null/);
+  assert.match(staticApp, /WebGL2 GPU/);
+  assert.match(staticApp, /CPU fallback/);
+  assert.match(staticApp, /GPU init failed:/);
+  assert.match(staticApp, /Average submit/);
+  assert.match(staticApp, /Preview size:/);
+  assert.match(staticApp, /if \(DEBUG_MODE\) recordPreviewTiming\("gpu", performance\.now\(\) - startedAt\)/);
+  assert.match(staticApp, /if \(DEBUG_MODE\) recordPreviewTiming\("cpu", performance\.now\(\) - startedAt\)/);
+  assert.match(gpuPreview, /onError\?\.\(\{ stage: "probe", error \}\)/);
+  assert.match(gpuPreview, /onError\?\.\(\{ stage: "renderer", error \}\)/);
+  assert.match(staticStyles, /\.diagnostic-overlay\s*\{[^}]*position:\s*absolute[^}]*pointer-events:\s*none/s);
+  assert.doesNotMatch(staticHtml, /data-preview-diagnostics/);
+  assert.match(page, /data-preview-diagnostics="true"/);
+  assert.match(page, /new URLSearchParams\(window\.location\.search\)\.get\("debug"\) === "1"/);
 });

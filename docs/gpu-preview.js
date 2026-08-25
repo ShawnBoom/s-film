@@ -1,4 +1,4 @@
-import { getFilterLut } from "./image-engine.js?v=39";
+import { getFilterLut } from "./image-engine.js?v=40";
 
 const VERTEX_SHADER = `#version 300 es
 in vec2 aPosition;
@@ -451,18 +451,21 @@ class GpuPreviewRenderer {
   }
 }
 
-export function createGpuPreviewRenderer(canvas) {
+export function createGpuPreviewRenderer(canvas, options = {}) {
+  const onError = typeof options.onError === "function" ? options.onError : null;
   try {
     const probe = document.createElement("canvas");
     const probeRenderer = new GpuPreviewRenderer(probe);
     probeRenderer.destroy();
-  } catch {
+  } catch (error) {
+    onError?.({ stage: "probe", error });
     return null;
   }
 
   try {
     return new GpuPreviewRenderer(canvas);
-  } catch {
+  } catch (error) {
+    onError?.({ stage: "renderer", error });
     return null;
   }
 }

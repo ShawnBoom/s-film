@@ -1,9 +1,10 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=39";
-import { hashSeed, processPixels } from "./image-engine.js?v=39";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=39";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=40";
+import { hashSeed, processPixels } from "./image-engine.js?v=40";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=40";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
+const DEBUG_MODE = new URLSearchParams(window.location.search).get("debug") === "1";
 
 const state = {
   photos: [],
@@ -36,7 +37,74 @@ const elements = {
   adjustmentTabs: Array.from(document.querySelectorAll("[data-adjustment]")),
 };
 
-const gpuPreview = createGpuPreviewRenderer(elements.canvas);
+const diagnostics = {
+  initError: "",
+  lastPath: "",
+  lastDuration: null,
+  samples: { gpu: [], cpu: [] },
+};
+
+const gpuPreview = DEBUG_MODE
+  ? createGpuPreviewRenderer(elements.canvas, {
+    onError({ stage, error }) {
+      const message = (error instanceof Error ? error.message : String(error)).replace(/\0/g, "");
+      diagnostics.initError = stage + ": " + message;
+    },
+  })
+  : createGpuPreviewRenderer(elements.canvas);
+const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
+
+function createDiagnosticOverlay() {
+  const overlay = document.createElement("aside");
+  overlay.className = "diagnostic-overlay";
+  overlay.dataset.previewDiagnostics = "true";
+  overlay.setAttribute("aria-label", "Preview diagnostics");
+  document.querySelector(".editor-card")?.append(overlay);
+  return overlay;
+}
+
+function updateDiagnosticOverlay() {
+  if (!diagnosticOverlay) return;
+  const photo = currentPhoto();
+  const edit = photo?.edit ?? createNeutralEdit();
+  const path = gpuPreview ? "gpu" : "cpu";
+  const samples = diagnostics.samples[path];
+  const average = samples.length
+    ? samples.reduce((sum, duration) => sum + duration, 0) / samples.length
+    : null;
+  const timingLabel = path === "gpu" ? "Submit" : "Render";
+  const averageLabel = path === "gpu" ? "Average submit" : "Average";
+  const size = state.sourceData
+    ? state.sourceData.width + " × " + state.sourceData.height
+    : "—";
+  const filterActive = Boolean(edit.filter && edit.strength > 0);
+
+  diagnosticOverlay.textContent = [
+    "Preview: " + (path === "gpu" ? "WebGL2 GPU" : "CPU fallback"),
+    gpuPreview ? "GPU init: OK" : "GPU init failed: " + (diagnostics.initError || "Unknown error"),
+    timingLabel + ": " + (diagnostics.lastPath === path && diagnostics.lastDuration !== null
+      ? diagnostics.lastDuration.toFixed(1) + " ms"
+      : "—"),
+    averageLabel + ": " + (average === null ? "—" : average.toFixed(1) + " ms"),
+    "Preview size: " + size,
+    "Filter: " + (filterActive ? "on" : "off"),
+    "Light: " + edit.brightness,
+    "Color: " + edit.color,
+    "Grain: " + edit.grain,
+  ].join("\n");
+}
+
+function recordPreviewTiming(path, duration) {
+  if (!DEBUG_MODE) return;
+  const samples = diagnostics.samples[path];
+  samples.push(duration);
+  if (samples.length > 10) samples.shift();
+  diagnostics.lastPath = path;
+  diagnostics.lastDuration = duration;
+  updateDiagnosticOverlay();
+}
+
+if (DEBUG_MODE) updateDiagnosticOverlay();
 
 function createNeutralEdit() {
   return { filter: null, strength: 100, brightness: 0, color: 0, grain: 0 };
@@ -234,6 +302,7 @@ async function prepareSource() {
     photo.width = image.naturalWidth;
     photo.height = image.naturalHeight;
     setStatus("照片已载入");
+    if (DEBUG_MODE) updateDiagnosticOverlay();
     queuePreview();
   } catch {
     if (token === state.loadToken) setStatus("照片载入失败，请换一张照片");
@@ -246,11 +315,14 @@ function queuePreview() {
     const photo = currentPhoto();
     if (!photo || !state.sourceData) return;
     if (gpuPreview) {
+      const startedAt = DEBUG_MODE ? performance.now() : 0;
       gpuPreview.render(photo.edit, photo.grainSeed, state.showOriginal);
+      if (DEBUG_MODE) recordPreviewTiming("gpu", performance.now() - startedAt);
       return;
     }
     const context = elements.canvas.getContext("2d");
     if (!context) return;
+    const startedAt = DEBUG_MODE ? performance.now() : 0;
     const pixels = state.showOriginal
       ? new Uint8ClampedArray(state.sourceData.data)
       : processPixels(state.sourceData, photo.edit, photo.grainSeed);
@@ -259,6 +331,7 @@ function queuePreview() {
       0,
       0,
     );
+    if (DEBUG_MODE) recordPreviewTiming("cpu", performance.now() - startedAt);
   });
 }
 
@@ -552,7 +625,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=39", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=40", { scope: "./" }).catch(() => {});
   });
 }
 
