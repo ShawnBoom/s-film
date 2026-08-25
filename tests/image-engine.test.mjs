@@ -121,15 +121,19 @@ function pixelOklabChroma(bytes, offset) {
   return Math.hypot(a, bValue);
 }
 
-test("Color v2.1 strengthens positive response and preserves the grayscale endpoint", () => {
+test("Color v2.2 strengthens only the positive response and preserves the locked negative curve", () => {
   assert.equal(getColorParameters(0).active, false);
-  assert.ok(Math.abs(getColorParameters(50).boost - 0.7 * 0.5 ** 1.15) < 1e-12);
-  assert.ok(getColorParameters(50).boost > 0.58 * 0.5 ** 1.15 * 1.15);
+  assert.ok(Math.abs(getColorParameters(25).boost - 0.95 * 0.25 ** 1.15) < 1e-12);
+  assert.ok(Math.abs(getColorParameters(50).boost - 0.95 * 0.5 ** 1.15) < 1e-12);
+  assert.ok(Math.abs(getColorParameters(75).boost - 0.95 * 0.75 ** 1.15) < 1e-12);
+  assert.equal(getColorParameters(100).boost, 0.95);
+  assert.ok(Math.abs(getColorParameters(-25).fade - 0.25 ** 1.15) < 1e-12);
   assert.ok(Math.abs(getColorParameters(-50).fade - 0.5 ** 1.15) < 1e-12);
+  assert.ok(Math.abs(getColorParameters(-75).fade - 0.75 ** 1.15) < 1e-12);
   assert.equal(getColorParameters(-100).fade, 1);
 });
 
-test("Color v2.1 wakes low-chroma colors before saturated colors and protects skin hues", () => {
+test("Color v2.2 wakes low-chroma colors before saturated colors and protects skin hues", () => {
   const colors = {
     width: 3,
     height: 1,
@@ -148,7 +152,7 @@ test("Color v2.1 wakes low-chroma colors before saturated colors and protects sk
 
   assert.ok(gains[0] > gains[1]);
   assert.ok(gains[0] > gains[2]);
-  assert.ok(gains[1] < 1.12);
+  assert.ok(gains[1] < 1.15);
   assert.ok(gains[2] < 1.12);
 });
 

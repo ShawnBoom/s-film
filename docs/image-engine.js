@@ -186,7 +186,7 @@ export function getColorParameters(color) {
   if (normalized > 0) {
     return {
       active: true,
-      boost: 0.7 * normalized ** 1.15,
+      boost: 0.95 * normalized ** 1.15,
       fade: 0,
     };
   }
