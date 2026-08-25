@@ -1,8 +1,8 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=47";
-import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=47";
-import { createExportProcessor } from "./export-processor.js?v=47";
-import { hashSeed, processPixels } from "./image-engine.js?v=47";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=47";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=48";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=48";
+import { createExportProcessor } from "./export-processor.js?v=48";
+import { hashSeed, processPixels } from "./image-engine.js?v=48";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=48";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -69,7 +69,7 @@ const gpuPreview = DEBUG_MODE
 const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
 const exportProcessor = createExportProcessor({
   createWorker: () => new Worker(
-    new URL("./export-worker.js?v=47", import.meta.url),
+    new URL("./export-worker.js?v=48", import.meta.url),
     { type: "module" },
   ),
   onFailure(error) {
@@ -781,7 +781,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=47", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=48", { scope: "./" }).catch(() => {});
   });
 }
 

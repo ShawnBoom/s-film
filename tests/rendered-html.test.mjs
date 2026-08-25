@@ -292,33 +292,33 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=47"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=47"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=47"/);
-  assert.match(staticWorker, /see-static-v47/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=47/);
-  assert.match(staticWorker, /gpu-export\.js\?v=47/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=48"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=48"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=48"/);
+  assert.match(staticWorker, /see-static-v48/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=48/);
+  assert.match(staticWorker, /gpu-export\.js\?v=48/);
   assert.doesNotMatch(staticWorker, /gpu-export-benchmark/);
-  assert.match(staticWorker, /export-processor\.js\?v=47/);
-  assert.match(staticWorker, /export-worker\.js\?v=47/);
-  assert.match(staticWorker, /image-engine\.js\?v=47/);
-  assert.match(staticWorker, /edit-state\.js\?v=47/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=47/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=47/);
-  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=47/);
-  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=47/);
-  assert.match(staticWorker, /s05-superia400-lut\.js\?v=47/);
-  assert.match(staticWorker, /s06-color100-lut\.js\?v=47/);
-  assert.match(staticWorker, /s07-color800z-lut\.js\?v=47/);
-  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=47/);
-  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=47/);
-  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=47/);
-  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=47/);
-  assert.match(staticWorker, /s12-portra400-lut\.js\?v=47/);
-  assert.match(staticWorker, /s13-gold200-lut\.js\?v=47/);
-  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=47/);
+  assert.match(staticWorker, /export-processor\.js\?v=48/);
+  assert.match(staticWorker, /export-worker\.js\?v=48/);
+  assert.match(staticWorker, /image-engine\.js\?v=48/);
+  assert.match(staticWorker, /edit-state\.js\?v=48/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=48/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=48/);
+  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=48/);
+  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=48/);
+  assert.match(staticWorker, /s05-superia400-lut\.js\?v=48/);
+  assert.match(staticWorker, /s06-color100-lut\.js\?v=48/);
+  assert.match(staticWorker, /s07-color800z-lut\.js\?v=48/);
+  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=48/);
+  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=48/);
+  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=48/);
+  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=48/);
+  assert.match(staticWorker, /s12-portra400-lut\.js\?v=48/);
+  assert.match(staticWorker, /s13-gold200-lut\.js\?v=48/);
+  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=48/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-v26/);
+  assert.match(appWorker, /see-v27/);
   assert.match(appWorker, /see-welcome\.png/);
 });
 
@@ -362,7 +362,7 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(staticApp, /await attemptGpuFullResolutionExport/);
   assert.match(staticApp, /await exportProcessor\.process\(source, photo\.edit, photo\.grainSeed\)/);
   assert.match(staticApp, /processPixels\(source, photo\.edit, photo\.grainSeed\)/);
-  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=47"/);
+  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=48"/);
   assert.match(exportWorker, /const pixels = processPixels\(source, message\.edit, message\.seed\)/);
 
   const sliderUpdate = staticApp.match(/function updateAdjustmentValue\(value\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
