@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
-import { createNeutralEdit, processPixels } from "../lib/image-engine.js";
+import { createNeutralEdit, getLightParameters, processPixels } from "../lib/image-engine.js";
 
 const source = {
   width: 3,
@@ -42,6 +42,49 @@ test("Original and Edited labels describe the currently visible image", () => {
 
 test("neutral edit is an exact pixel no-op", () => {
   assert.deepEqual(processPixels(source, createNeutralEdit(), 42), source.data);
+});
+
+test("Light v2 uses the nonlinear two-stop EV curve", () => {
+  const anchors = [
+    [-100, -2],
+    [-75, -1.336],
+    [-50, -0.758],
+    [-25, -0.287],
+    [0, 0],
+    [25, 0.287],
+    [50, 0.758],
+    [75, 1.336],
+    [100, 2],
+  ];
+  for (const [value, expected] of anchors) {
+    assert.ok(Math.abs(getLightParameters(value).ev - expected) < 0.002);
+  }
+});
+
+test("Light v2 is true exposure reduction for negative values and protects positive highlights", () => {
+  const grayscale = {
+    width: 3,
+    height: 1,
+    data: new Uint8ClampedArray([
+      0, 0, 0, 255,
+      96, 96, 96, 255,
+      235, 235, 235, 255,
+    ]),
+  };
+  const darkened = processPixels(
+    grayscale,
+    { filter: null, strength: 100, brightness: -50, color: 0, grain: 0 },
+  );
+  const brightened = processPixels(
+    grayscale,
+    { filter: null, strength: 100, brightness: 50, color: 0, grain: 0 },
+  );
+
+  assert.deepEqual(Array.from(darkened.slice(0, 4)), [0, 0, 0, 255]);
+  assert.ok(darkened[4] < 96);
+  assert.ok(brightened[4] > 96);
+  assert.ok(brightened[8] < 255);
+  assert.ok((brightened[4] / 96) > (brightened[8] / 235));
 });
 
 test("preset strength zero restores the exact original", () => {
