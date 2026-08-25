@@ -229,22 +229,22 @@ export function getColorParameters(color) {
   if (normalized > 0) {
     return {
       active: true,
-      boost: 0.58 * normalized ** 1.15,
-      chromaScale: 1,
+      boost: 0.7 * normalized ** 1.15,
+      fade: 0,
     };
   }
   if (normalized < 0) {
     return {
       active: true,
       boost: 0,
-      chromaScale: 1 - Math.abs(normalized) ** 1.15,
+      fade: Math.abs(normalized) ** 1.15,
     };
   }
-  return { active: false, boost: 0, chromaScale: 1 };
+  return { active: false, boost: 0, fade: 0 };
 }
 
 function applyColor(r, g, b, parameters) {
-  const { boost, chromaScale } = parameters;
+  const { boost, fade } = parameters;
 
   const [L, a, bValue] = linearRgbToOklab(r, g, b);
   const chroma = Math.hypot(a, bValue);
@@ -252,7 +252,14 @@ function applyColor(r, g, b, parameters) {
 
   let factor;
   if (boost === 0) {
-    factor = chromaScale;
+    const chromaRatio = chroma / 0.12;
+    const highChromaWeight = chromaRatio / (1 + chromaRatio);
+    const fadeMultiplier = 1.12 + (0.88 - 1.12) * highChromaWeight;
+    const effectiveFade = Math.min(
+      1,
+      fade * (fadeMultiplier + (1 - fadeMultiplier) * fade),
+    );
+    factor = 1 - effectiveFade;
   } else {
     const hue = ((Math.atan2(bValue, a) * 180) / Math.PI + 360) % 360;
     const skinDistance = Math.min(Math.abs(hue - 50), 360 - Math.abs(hue - 50));

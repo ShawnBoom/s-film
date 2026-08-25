@@ -115,14 +115,15 @@ function pixelOklabChroma(bytes, offset) {
   return Math.hypot(a, bValue);
 }
 
-test("Color v2 precomputes softened positive and negative response curves", () => {
+test("Color v2.1 strengthens positive response and preserves the grayscale endpoint", () => {
   assert.equal(getColorParameters(0).active, false);
-  assert.ok(Math.abs(getColorParameters(50).boost - 0.58 * 0.5 ** 1.15) < 1e-12);
-  assert.ok(Math.abs(getColorParameters(-50).chromaScale - (1 - 0.5 ** 1.15)) < 1e-12);
-  assert.equal(getColorParameters(-100).chromaScale, 0);
+  assert.ok(Math.abs(getColorParameters(50).boost - 0.7 * 0.5 ** 1.15) < 1e-12);
+  assert.ok(getColorParameters(50).boost > 0.58 * 0.5 ** 1.15 * 1.15);
+  assert.ok(Math.abs(getColorParameters(-50).fade - 0.5 ** 1.15) < 1e-12);
+  assert.equal(getColorParameters(-100).fade, 1);
 });
 
-test("Color v2 wakes low-chroma colors before saturated colors and protects skin hues", () => {
+test("Color v2.1 wakes low-chroma colors before saturated colors and protects skin hues", () => {
   const colors = {
     width: 3,
     height: 1,
@@ -141,11 +142,32 @@ test("Color v2 wakes low-chroma colors before saturated colors and protects skin
 
   assert.ok(gains[0] > gains[1]);
   assert.ok(gains[0] > gains[2]);
-  assert.ok(gains[1] < 1.1);
+  assert.ok(gains[1] < 1.12);
   assert.ok(gains[2] < 1.12);
 });
 
-test("Color v2 reaches perceptual grayscale at -100", () => {
+test("Color v2.1 fades muted colors sooner than saturated colors", () => {
+  const colors = {
+    width: 2,
+    height: 1,
+    data: new Uint8ClampedArray([
+      112, 126, 140, 255,
+      25, 70, 220, 255,
+    ]),
+  };
+  const result = processPixels(
+    colors,
+    { filter: null, strength: 100, brightness: 0, color: -50, grain: 0 },
+  );
+  const mutedRemaining = pixelOklabChroma(result, 0) / pixelOklabChroma(colors.data, 0);
+  const saturatedRemaining = pixelOklabChroma(result, 4) / pixelOklabChroma(colors.data, 4);
+
+  assert.ok(mutedRemaining < saturatedRemaining);
+  assert.ok(mutedRemaining > 0.45);
+  assert.ok(saturatedRemaining < 0.7);
+});
+
+test("Color v2.1 reaches perceptual grayscale at -100", () => {
   const result = processPixels(
     source,
     { filter: null, strength: 100, brightness: 0, color: -100, grain: 0 },

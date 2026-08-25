@@ -32,7 +32,7 @@ uniform float uStrength;
 uniform float uExposureGain;
 uniform bool uLightPositive;
 uniform float uColorBoost;
-uniform float uColorChromaScale;
+uniform float uColorFade;
 uniform float uGrainCoordinateScale;
 uniform float uGrainBaseScale;
 uniform float uGrainAmplitude;
@@ -153,7 +153,7 @@ vec3 gamutMapOklab(vec3 lab) {
 }
 
 vec3 applyColor(vec3 rgb) {
-  if (uColorBoost == 0.0 && uColorChromaScale == 1.0) return rgb;
+  if (uColorBoost == 0.0 && uColorFade == 0.0) return rgb;
 
   vec3 lab = linearRgbToOklab(rgb);
   float chroma = length(lab.yz);
@@ -161,7 +161,15 @@ vec3 applyColor(vec3 rgb) {
 
   float factor;
   if (uColorBoost == 0.0) {
-    factor = uColorChromaScale;
+    float chromaRatio = chroma / 0.12;
+    float highChromaWeight = chromaRatio / (1.0 + chromaRatio);
+    float fadeMultiplier = mix(1.12, 0.88, highChromaWeight);
+    float effectiveFade = clamp(
+      uColorFade * (fadeMultiplier + (1.0 - fadeMultiplier) * uColorFade),
+      0.0,
+      1.0
+    );
+    factor = 1.0 - effectiveFade;
   } else {
     float hue = mod(degrees(atan(lab.z, lab.y)) + 360.0, 360.0);
     float rawDistance = abs(hue - 50.0);
@@ -324,7 +332,7 @@ class GpuPreviewRenderer {
       exposureGain: location(gl, this.program, "uExposureGain"),
       lightPositive: location(gl, this.program, "uLightPositive"),
       colorBoost: location(gl, this.program, "uColorBoost"),
-      colorChromaScale: location(gl, this.program, "uColorChromaScale"),
+      colorFade: location(gl, this.program, "uColorFade"),
       grainCoordinateScale: location(gl, this.program, "uGrainCoordinateScale"),
       grainBaseScale: location(gl, this.program, "uGrainBaseScale"),
       grainAmplitude: location(gl, this.program, "uGrainAmplitude"),
@@ -445,7 +453,7 @@ class GpuPreviewRenderer {
     gl.uniform1i(this.uniforms.lightPositive, light.positive ? 1 : 0);
     const color = getColorParameters(edit.color ?? 0);
     gl.uniform1f(this.uniforms.colorBoost, color.boost);
-    gl.uniform1f(this.uniforms.colorChromaScale, color.chromaScale);
+    gl.uniform1f(this.uniforms.colorFade, color.fade);
     const grain = getGrainParameters(
       edit.grain ?? 0,
       this.canvas.width,
