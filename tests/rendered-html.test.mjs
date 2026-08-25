@@ -292,27 +292,27 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=40"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=40"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=40"/);
-  assert.match(staticWorker, /see-static-v40/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=40/);
-  assert.match(staticWorker, /image-engine\.js\?v=40/);
-  assert.match(staticWorker, /edit-state\.js\?v=40/);
-  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=40/);
-  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=40/);
-  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=40/);
-  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=40/);
-  assert.match(staticWorker, /s05-superia400-lut\.js\?v=40/);
-  assert.match(staticWorker, /s06-color100-lut\.js\?v=40/);
-  assert.match(staticWorker, /s07-color800z-lut\.js\?v=40/);
-  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=40/);
-  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=40/);
-  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=40/);
-  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=40/);
-  assert.match(staticWorker, /s12-portra400-lut\.js\?v=40/);
-  assert.match(staticWorker, /s13-gold200-lut\.js\?v=40/);
-  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=40/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=41"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=41"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=41"/);
+  assert.match(staticWorker, /see-static-v41/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=41/);
+  assert.match(staticWorker, /image-engine\.js\?v=41/);
+  assert.match(staticWorker, /edit-state\.js\?v=41/);
+  assert.match(staticWorker, /s01-classic-neg-lut\.js\?v=41/);
+  assert.match(staticWorker, /s02-classic-chrome-lut\.js\?v=41/);
+  assert.match(staticWorker, /s03-classic-chrome-lut\.js\?v=41/);
+  assert.match(staticWorker, /s04-pro400h-lut\.js\?v=41/);
+  assert.match(staticWorker, /s05-superia400-lut\.js\?v=41/);
+  assert.match(staticWorker, /s06-color100-lut\.js\?v=41/);
+  assert.match(staticWorker, /s07-color800z-lut\.js\?v=41/);
+  assert.match(staticWorker, /s08-gold-blue-lut\.js\?v=41/);
+  assert.match(staticWorker, /s09-portra-cool-lut\.js\?v=41/);
+  assert.match(staticWorker, /s10-proimage-original-lut\.js\?v=41/);
+  assert.match(staticWorker, /s11-ektar100-lut\.js\?v=41/);
+  assert.match(staticWorker, /s12-portra400-lut\.js\?v=41/);
+  assert.match(staticWorker, /s13-gold200-lut\.js\?v=41/);
+  assert.match(staticWorker, /s14-chrome64-lut\.js\?v=41/);
   assert.match(staticWorker, /see-welcome\.png/);
   assert.match(appWorker, /see-v21/);
   assert.match(appWorker, /see-welcome\.png/);
@@ -344,11 +344,12 @@ test("uses a GPU live preview without changing the CPU export pipeline", async (
 });
 
 test("shows preview diagnostics only for the temporary debug query mode", async () => {
-  const [page, staticHtml, staticApp, gpuPreview, staticStyles] = await Promise.all([
+  const [page, staticHtml, staticApp, gpuPreview, sourceGpuPreview, staticStyles] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../docs/index.html", import.meta.url), "utf8"),
     readFile(new URL("../docs/app.js", import.meta.url), "utf8"),
     readFile(new URL("../docs/gpu-preview.js", import.meta.url), "utf8"),
+    readFile(new URL("../lib/gpu-preview.js", import.meta.url), "utf8"),
     readFile(new URL("../docs/styles.css", import.meta.url), "utf8"),
   ]);
 
@@ -363,8 +364,41 @@ test("shows preview diagnostics only for the temporary debug query mode", async 
   assert.match(staticApp, /if \(DEBUG_MODE\) recordPreviewTiming\("cpu", performance\.now\(\) - startedAt\)/);
   assert.match(gpuPreview, /onError\?\.\(\{ stage: "probe", error \}\)/);
   assert.match(gpuPreview, /onError\?\.\(\{ stage: "renderer", error \}\)/);
+  assert.match(gpuPreview, /precision highp sampler3D;/);
+  assert.match(sourceGpuPreview, /precision highp sampler3D;/);
   assert.match(staticStyles, /\.diagnostic-overlay\s*\{[^}]*position:\s*absolute[^}]*pointer-events:\s*none/s);
   assert.doesNotMatch(staticHtml, /data-preview-diagnostics/);
   assert.match(page, /data-preview-diagnostics="true"/);
   assert.match(page, /new URLSearchParams\(window\.location\.search\)\.get\("debug"\) === "1"/);
+});
+
+test("preserves CPU fallback when WebGL2 initialization is forced to fail", async () => {
+  const originalDocument = globalThis.document;
+  const failures = [];
+  globalThis.document = {
+    createElement() {
+      return { getContext: () => null };
+    },
+  };
+
+  try {
+    const moduleUrl = new URL("../lib/gpu-preview.js", import.meta.url);
+    moduleUrl.searchParams.set("forced-fallback", String(Date.now()));
+    const { createGpuPreviewRenderer } = await import(moduleUrl.href);
+    const renderer = createGpuPreviewRenderer(
+      { getContext: () => null },
+      { onError: (failure) => failures.push(failure) },
+    );
+    assert.equal(renderer, null);
+    assert.equal(failures.length, 1);
+    assert.equal(failures[0].stage, "probe");
+    assert.match(String(failures[0].error), /WebGL 2 is unavailable/);
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
+
+  const staticApp = await readFile(new URL("../docs/app.js", import.meta.url), "utf8");
+  assert.match(staticApp, /if \(gpuPreview\)/);
+  assert.match(staticApp, /processPixels\(state\.sourceData, photo\.edit, photo\.grainSeed\)/);
 });

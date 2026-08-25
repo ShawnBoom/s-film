@@ -1,6 +1,6 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=40";
-import { hashSeed, processPixels } from "./image-engine.js?v=40";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=40";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=41";
+import { hashSeed, processPixels } from "./image-engine.js?v=41";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=41";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -625,7 +625,7 @@ window.addEventListener("beforeunload", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=40", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=41", { scope: "./" }).catch(() => {});
   });
 }
 

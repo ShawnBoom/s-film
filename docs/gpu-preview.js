@@ -1,4 +1,4 @@
-import { getFilterLut } from "./image-engine.js?v=40";
+import { getFilterLut } from "./image-engine.js?v=41";
 
 const VERTEX_SHADER = `#version 300 es
 in vec2 aPosition;
@@ -13,6 +13,7 @@ void main() {
 const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 precision highp int;
+precision highp sampler3D;
 
 in vec2 vUv;
 out vec4 outColor;
