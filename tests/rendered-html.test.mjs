@@ -92,7 +92,7 @@ test("keeps photo processing local, independent per photo, and batch-capable", a
   assert.match(page, /0\.95/);
   assert.match(engine, /linearRgbToOklab/);
   assert.match(engine, /applyExposure/);
-  assert.match(engine, /createBandLimitedGrainField/);
+  assert.match(engine, /createReferenceCalibratedGrainField/);
   assert.doesNotMatch(engine, /particleField|finePopulation|mediumPopulation|coarsePopulation/);
   assert.doesNotMatch(engine, /correlatedExcitation|correlatedGrainField|primaryScale|scanned.*grain/i);
   assert.match(engine, /strength === 0/);
@@ -302,21 +302,21 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=55"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=55"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=55"/);
-  assert.match(staticApp, /from "\.\/lut-loader\.js\?v=55"/);
-  assert.match(staticWorker, /see-core-v55/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=56"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=56"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=56"/);
+  assert.match(staticApp, /from "\.\/lut-loader\.js\?v=56"/);
+  assert.match(staticWorker, /see-core-v56/);
   assert.match(staticPackWorker, /see-luts-v52/);
   assert.match(staticPackWorker, /see-luts-bin-v/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=55/);
-  assert.match(staticWorker, /gpu-export\.js\?v=55/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=56/);
+  assert.match(staticWorker, /gpu-export\.js\?v=56/);
   assert.doesNotMatch(staticWorker, /gpu-export-benchmark/);
-  assert.match(staticWorker, /export-processor\.js\?v=55/);
-  assert.match(staticWorker, /export-worker\.js\?v=55/);
-  assert.match(staticWorker, /image-engine\.js\?v=55/);
-  assert.match(staticWorker, /edit-state\.js\?v=55/);
-  assert.match(staticWorker, /lut-loader\.js\?v=55/);
+  assert.match(staticWorker, /export-processor\.js\?v=56/);
+  assert.match(staticWorker, /export-worker\.js\?v=56/);
+  assert.match(staticWorker, /image-engine\.js\?v=56/);
+  assert.match(staticWorker, /edit-state\.js\?v=56/);
+  assert.match(staticWorker, /lut-loader\.js\?v=56/);
   const coreShell = staticWorker.match(/const CORE_APP_SHELL = \[([\s\S]*?)\n\];/)?.[1] ?? "";
   assert.doesNotMatch(coreShell, /s(?:0[1-9]|1[0-4])-[^"']+-lut\.js/);
   assert.doesNotMatch(coreShell, /luts-bin\/v1\/[^"']+\.bin/);
@@ -331,8 +331,8 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
   assert.match(staticPackWorker, /preparationPromise/);
   assert.match(staticPackWorker, /Math\.min\(2, missing\.length\)/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-core-v55/);
-  assert.match(appWorker, /see-runtime-v55/);
+  assert.match(appWorker, /see-core-v56/);
+  assert.match(appWorker, /see-runtime-v56/);
   assert.match(appWorker, /see-welcome\.png/);
 });
 
@@ -353,18 +353,24 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(gpuPreview, /uniform sampler3D uLut/);
   assert.match(gpuPreview, /vec3 applyExposure/);
   assert.match(gpuPreview, /vec3 applyColor/);
-  assert.match(gpuPreview, /GRAIN_NOISE_FRAGMENT_SHADER/);
-  assert.match(gpuPreview, /GRAIN_HORIZONTAL_FRAGMENT_SHADER/);
-  assert.match(gpuPreview, /GRAIN_VERTICAL_FRAGMENT_SHADER/);
+  assert.match(gpuPreview, /GRAIN_FIELD_FRAGMENT_SHADER/);
   assert.match(gpuPreview, /GRAIN_COMPOSE_FRAGMENT_SHADER/);
+  assert.doesNotMatch(gpuPreview, /GRAIN_NOISE_FRAGMENT_SHADER/);
+  assert.doesNotMatch(gpuPreview, /GRAIN_HORIZONTAL_FRAGMENT_SHADER/);
+  assert.doesNotMatch(gpuPreview, /GRAIN_VERTICAL_FRAGMENT_SHADER/);
   assert.match(gpuPreview, /uniform float uExposureGain/);
   assert.match(gpuPreview, /uniform float uColorBoost/);
   assert.match(gpuPreview, /uniform float uColorFade/);
   assert.match(gpuPreview, /uniform float uRmsStops/);
-  assert.match(gpuPreview, /uniform float uRoughness/);
+  assert.match(gpuPreview, /uniform float uProfileMix/);
+  assert.match(gpuPreview, /uniform float uTailMix/);
+  assert.match(gpuPreview, /uniform float uBlendNormalization/);
   assert.match(gpuPreview, /uniform float uDetailCoupling/);
-  assert.match(gpuPreview, /float band = clamp\(\(small - broad\) \* 5\.62214436/);
-  assert.match(gpuPreview, /float exposureStops = field \* uRmsStops \* signalResponse/);
+  assert.match(gpuPreview, /prewarmGrain\(seed\)/);
+  assert.match(gpuPreview, /if \(sizeKey === this\.processedSizeKey\) return/);
+  assert.match(gpuPreview, /if \(cacheKey === this\.grainCacheKey\) return/);
+  assert.match(gpuPreview, /grainFirstActivationDuration/);
+  assert.match(gpuPreview, /float exposureStops = field \* localRmsStops/);
   assert.match(gpuPreview, /float requestedScale = targetLuminance \/ luminance/);
   assert.match(gpuPreview, /rgb \* scale/);
   assert.doesNotMatch(gpuPreview, /particleField|uGrainActivation|correlatedGrainField/);
@@ -375,27 +381,26 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(engine, /export function getColorParameters/);
   assert.match(engine, /export function getGrainParameters/);
   assert.match(engine, /960 \/ Math\.max\(1, width, height\)/);
-  assert.match(engine, /engine: "v5-band-limited"/);
-  assert.match(engine, /bandPassSmallSigma: 0\.65/);
-  assert.match(engine, /bandPassBroadSigma: 1\.3/);
-  assert.match(engine, /rmsStops: 0\.085/);
-  assert.match(engine, /roughness: 0\.25/);
-  assert.match(engine, /detailCoupling: 0\.035/);
+  assert.match(engine, /engine: "v6-reference-calibrated"/);
+  assert.match(engine, /label: "黄油100 target"/);
+  assert.match(engine, /label: "Snapseed100 target"/);
+  assert.match(engine, /rmsStops: 0\.2/);
+  assert.match(engine, /rmsStops: 0\.44/);
+  assert.match(engine, /detailCoupling: 0\.015/);
   assert.doesNotMatch(engine, /acutanceRecovery|correlatedExcitation|primaryScale/);
   assert.doesNotMatch(engine, /chromaAmount|chromaA|chromaB/);
 
   for (const sharedConstant of [
-    "0.00001453",
-    "0.00539458",
-    "0.18785872",
-    "0.65",
-    "0.02153191",
-    "0.09452136",
-    "0.22961404",
-    "0.30866539",
-    "5.62214436",
-    "1.0865",
-    "0.0608",
+    "0.05752784",
+    "-0.00116834",
+    "-0.028172",
+    "0.23384847",
+    "0.04243676",
+    "-0.01609937",
+    "1.00885824",
+    "1.10777083",
+    "1.48608837",
+    "1.39217813",
   ]) {
     assert.ok(engine.includes(sharedConstant), `CPU grain is missing ${sharedConstant}`);
     assert.ok(gpuPreview.includes(sharedConstant), `GPU grain is missing ${sharedConstant}`);
@@ -403,11 +408,13 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(page, /function createSessionGrainSeed/);
   assert.match(page, /crypto\?\.getRandomValues/);
   assert.match(staticApp, /grainSeed: createSessionGrainSeed\(file, id\)/);
+  assert.match(staticApp, /requestIdleCallback\(prewarm, \{ timeout: 250 \}\)/);
+  assert.match(staticApp, /gpuPreview\.prewarmGrain\(photo\.grainSeed\)/);
   assert.match(staticApp, /await attemptGpuFullResolutionExport/);
   assert.match(staticApp, /await ensureExportProcessor\(\)\.process\(source, photo\.edit, photo\.grainSeed\)/);
   assert.match(staticApp, /processPixels\(source, photo\.edit, photo\.grainSeed\)/);
-  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=55"/);
-  assert.match(exportWorker, /import \{ loadFilterLut \} from "\.\/lut-loader\.js\?v=55"/);
+  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=56"/);
+  assert.match(exportWorker, /import \{ loadFilterLut \} from "\.\/lut-loader\.js\?v=56"/);
   assert.match(exportWorker, /await loadFilterLut\(message\.edit\?\.filter\)/);
   assert.match(exportWorker, /const pixels = processPixels\(source, message\.edit, message\.seed\)/);
 
@@ -446,12 +453,18 @@ test("shows actual preview and production export diagnostics only for debug quer
   assert.match(staticApp, /GPU fallback:/);
   assert.match(staticApp, /Light v2:/);
   assert.match(staticApp, /Color v2\.1:/);
-  assert.match(staticApp, /Grain engine: v5-band-limited/);
+  assert.match(staticApp, /Grain engine: v6 reference-calibrated/);
   assert.match(staticApp, /Reference grain scale: 960 px long edge/);
-  assert.match(staticApp, /Band-pass scales:/);
+  assert.match(staticApp, /Profile A:/);
+  assert.match(staticApp, /Profile B:/);
+  assert.match(staticApp, /Current interpolation:/);
   assert.match(staticApp, /RMS amplitude:/);
   assert.match(staticApp, /Roughness:/);
   assert.match(staticApp, /Detail coupling:/);
+  assert.match(staticApp, /Grain resources:/);
+  assert.match(staticApp, /Grain prewarm submit:/);
+  assert.match(staticApp, /First activation submit:/);
+  assert.match(staticApp, /Slider submit:/);
   assert.match(staticApp, /Reference LF energy ratio:/);
   assert.match(staticApp, /grainSeed:/);
   assert.match(staticApp, /LUT architecture:/);

@@ -189,30 +189,36 @@ test("Color v2.1 reaches perceptual grayscale at -100", () => {
   }
 });
 
-test("Grain v5 maps the slider to exposure RMS, restrained roughness, and detail coupling", () => {
-  const values = [15, 25, 50, 75, 100].map((grain) =>
+test("Grain v6 anchors Grain 50 and 100 to the measured reference profiles", () => {
+  const values = [15, 25, 49, 50, 51, 75, 100].map((grain) =>
     getGrainParameters(grain, 4032, 3024));
   for (let index = 1; index < values.length; index += 1) {
     assert.ok(values[index].rmsStops > values[index - 1].rmsStops);
-    assert.ok(values[index].roughness > values[index - 1].roughness);
-    assert.ok(values[index].detailCoupling > values[index - 1].detailCoupling);
-    assert.equal(values[index].bandPassSmallSigma, values[0].bandPassSmallSigma);
-    assert.equal(values[index].bandPassBroadSigma, values[0].bandPassBroadSigma);
+    assert.equal(values[index].referenceLongEdge, 960);
+    assert.equal(values[index].engine, "v6-reference-calibrated");
   }
-  assert.equal(values[0].engine, "v5-band-limited");
-  assert.equal(values[0].referenceLongEdge, 960);
-  assert.equal(values[0].bandPassSmallSigma, 0.65);
-  assert.equal(values[0].bandPassBroadSigma, 1.3);
-  assert.ok(Math.abs(values[2].rmsStops - 0.04555037215779246) < 1e-12);
-  assert.equal(values[4].rmsStops, 0.085);
-  assert.equal(values[4].detailCoupling, 0.035);
+  const profileA = values[3];
+  const profileB = values[6];
+  assert.equal(profileA.profileA, "黄油100 target");
+  assert.equal(profileA.profileB, "Snapseed100 target");
+  assert.equal(profileA.profileInterpolation, 0);
+  assert.equal(profileA.tailMix, 1);
+  assert.equal(profileA.rmsStops, 0.2);
+  assert.equal(profileA.roughness, 0.18);
+  assert.equal(profileA.detailCoupling, 0.015);
+  assert.equal(profileB.profileInterpolation, 1);
+  assert.equal(profileB.rmsStops, 0.44);
+  assert.equal(profileB.roughness, 0.14);
+  assert.equal(profileB.detailCoupling, 0);
+  assert.ok(values[4].rmsStops - profileA.rmsStops < 0.005);
+  assert.ok(profileA.rmsStops - values[2].rmsStops < 0.005);
   const disabled = getGrainParameters(0, 4032, 3024);
   assert.equal(disabled.active, false);
   assert.equal(disabled.rmsStops, 0);
   assert.equal(disabled.detailCoupling, 0);
 });
 
-test("Grain v5 is luminance-oriented and approximately zero-mean", () => {
+test("Grain v6 is luminance-oriented and approximately exposure-neutral", () => {
   const width = 128;
   const height = 128;
   const gray = new Uint8ClampedArray(width * height * 4);
@@ -227,24 +233,24 @@ test("Grain v5 is luminance-oriented and approximately zero-mean", () => {
     { filter: null, strength: 100, brightness: 0, color: 0, grain: 100 },
     2468,
   );
-  let total = 0;
+  let linearTotal = 0;
+  const originalLinear = srgbChannelToLinear(128);
   for (let offset = 0; offset < result.length; offset += 4) {
     assert.equal(result[offset], result[offset + 1]);
     assert.equal(result[offset], result[offset + 2]);
-    total += result[offset];
+    linearTotal += srgbChannelToLinear(result[offset]);
   }
-  assert.ok(Math.abs(total / (width * height) - 128) < 1);
+  assert.ok(Math.abs(linearTotal / (width * height) - originalLinear) < 0.012);
 });
 
-test("Grain v5 keeps reference-space band scales resolution-independent", () => {
+test("Grain v6 keeps its 960px reference coordinate system resolution-independent", () => {
   const preview = getGrainParameters(50, 540, 960);
   const exportSize = getGrainParameters(50, 2268, 4032);
   const landscape = getGrainParameters(50, 960, 540);
   assert.equal(preview.coordinateScale, 1);
   assert.equal(exportSize.coordinateScale, 960 / 4032);
-  assert.equal(preview.bandPassSmallSigma, exportSize.bandPassSmallSigma);
-  assert.equal(preview.bandPassBroadSigma, exportSize.bandPassBroadSigma);
-  assert.equal(preview.bandPassSmallSigma, landscape.bandPassSmallSigma);
+  assert.equal(preview.effectiveMedianPeriodRefPx, exportSize.effectiveMedianPeriodRefPx);
+  assert.equal(preview.referenceLowFrequencyEnergyRatio, exportSize.referenceLowFrequencyEnergyRatio);
   assert.equal(preview.referenceWidth, 540);
   assert.equal(preview.referenceHeight, 960);
   assert.equal(exportSize.referenceWidth, 540);
@@ -253,7 +259,7 @@ test("Grain v5 keeps reference-space band scales resolution-independent", () => 
   assert.equal(landscape.referenceHeight, 540);
 });
 
-test("Grain v5 produces short-range correlated texture without multi-pixel persistence", () => {
+test("Grain v6 Profile A produces short-range correlated texture without persistence", () => {
   const width = 960;
   const height = 192;
   const gray = new Uint8ClampedArray(width * height * 4);
@@ -638,7 +644,7 @@ test("brightness and perceptual color controls respond across their full ranges"
   }
 });
 
-test("Grain v5 is neutral at zero, seed-stable, reversible, and random per import", () => {
+test("Grain v6 is neutral at zero, seed-stable, reversible, and random per import", () => {
   const edit = { filter: null, strength: 100, brightness: 0, color: 0, grain: 65 };
   const first = processPixels(source, edit, 123);
   const second = processPixels(source, edit, 123);

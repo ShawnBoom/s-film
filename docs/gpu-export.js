@@ -1,4 +1,4 @@
-import { createGpuFullResolutionRenderer } from "./gpu-preview.js?v=55";
+import { createGpuFullResolutionRenderer } from "./gpu-preview.js?v=56";
 
 function messageFrom(error) {
   return (error instanceof Error ? error.message : String(error || "Unknown GPU export failure"))

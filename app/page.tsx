@@ -338,6 +338,8 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
+    let grainWarmHandle: number | null = null;
+    let grainWarmUsesIdle = false;
     sourceDataRef.current = null;
 
     async function prepareSource() {
@@ -396,6 +398,25 @@ export default function Home() {
         setSourceVersion((version) => version + 1);
         if (debugMode) setDebugVersion((version) => version + 1);
         setStatus("照片已载入");
+        if (gpuPreviewRef.current) {
+          const preview = gpuPreviewRef.current;
+          const grainSeed = photosRef.current.find((item) => item.id === currentPhotoId)?.grainSeed;
+          const prewarm = () => {
+            if (cancelled || grainSeed === undefined) return;
+            preview.prewarmGrain(grainSeed);
+            if (debugMode) setDebugVersion((version) => version + 1);
+          };
+          const idleWindow = window as typeof window & {
+            requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+            cancelIdleCallback?: (handle: number) => void;
+          };
+          if (idleWindow.requestIdleCallback) {
+            grainWarmUsesIdle = true;
+            grainWarmHandle = idleWindow.requestIdleCallback(prewarm, { timeout: 250 });
+          } else {
+            grainWarmHandle = window.setTimeout(prewarm, 0);
+          }
+        }
       } catch {
         if (!cancelled) setStatus("照片载入失败，请换一张照片");
       }
@@ -404,6 +425,13 @@ export default function Home() {
     void prepareSource();
     return () => {
       cancelled = true;
+      if (grainWarmHandle !== null) {
+        const idleWindow = window as typeof window & {
+          cancelIdleCallback?: (handle: number) => void;
+        };
+        if (grainWarmUsesIdle) idleWindow.cancelIdleCallback?.(grainWarmHandle);
+        else window.clearTimeout(grainWarmHandle);
+      }
     };
   }, [currentPhotoId, sourceUrl, debugMode]);
 
@@ -762,6 +790,12 @@ export default function Home() {
     currentPhoto?.width ?? 1,
     currentPhoto?.height ?? 1,
   );
+  const diagnosticGrainGpu = gpuPreviewRef.current?.getGrainDiagnostics() ?? {
+    state: gpuPreviewAttemptedRef.current ? "CPU fallback" : "cold",
+    prewarm: null,
+    firstActivation: null,
+    sliderUpdate: null,
+  };
   const diagnosticFilterActive = Boolean(currentEdit.filter && currentEdit.strength > 0);
   const exportTiming = diagnosticsRef.current.exportTiming;
   const exportDuration = (value: number | null) => value === null ? "—" : value.toFixed(1) + " ms";
@@ -815,13 +849,18 @@ export default function Home() {
     "Grain: " + currentEdit.grain,
     "Light v2: " + (currentEdit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (currentEdit.color === 0 ? "off" : "active"),
-    "Grain engine: v5-band-limited " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
+    "Grain engine: v6 reference-calibrated " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
     "Reference grain scale: 960 px long edge",
-    "Band-pass scales: σ " + diagnosticGrain.bandPassSmallSigma.toFixed(2)
-      + " / " + diagnosticGrain.bandPassBroadSigma.toFixed(2) + " ref px",
+    "Profile A: " + diagnosticGrain.profileA,
+    "Profile B: " + diagnosticGrain.profileB,
+    "Current interpolation: " + diagnosticGrain.profileInterpolation.toFixed(3),
     "RMS amplitude: " + diagnosticGrain.rmsStops.toFixed(4) + " stops",
     "Roughness: " + diagnosticGrain.roughness.toFixed(3),
     "Detail coupling: " + diagnosticGrain.detailCoupling.toFixed(3),
+    "Grain resources: " + diagnosticGrainGpu.state,
+    "Grain prewarm submit: " + exportDuration(diagnosticGrainGpu.prewarm),
+    "First activation submit: " + exportDuration(diagnosticGrainGpu.firstActivation),
+    "Slider submit: " + exportDuration(diagnosticGrainGpu.sliderUpdate),
     "Reference LF energy ratio: "
       + diagnosticGrain.referenceLowFrequencyEnergyRatio.toFixed(4),
     "grainSeed: " + (currentPhoto ? currentPhoto.grainSeed : "—"),

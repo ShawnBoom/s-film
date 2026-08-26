@@ -1,14 +1,14 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=55";
-import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=55";
-import { createExportProcessor } from "./export-processor.js?v=55";
-import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=55";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=56";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=56";
+import { createExportProcessor } from "./export-processor.js?v=56";
+import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=56";
 import {
   getLutPackStatus,
   loadFilterLut,
   prepareOfflineLutPack,
   subscribeLutPackStatus,
-} from "./lut-loader.js?v=55";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=55";
+} from "./lut-loader.js?v=56";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=56";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -108,7 +108,7 @@ function ensureExportProcessor() {
   if (exportProcessor) return exportProcessor;
   exportProcessor = createExportProcessor({
     createWorker: () => new Worker(
-      new URL("./export-worker.js?v=55", import.meta.url),
+      new URL("./export-worker.js?v=56", import.meta.url),
       { type: "module" },
     ),
     onWorkerCreated() {
@@ -165,6 +165,12 @@ function updateDiagnosticOverlay() {
     state.sourceData?.width ?? 1,
     state.sourceData?.height ?? 1,
   );
+  const grainGpuDiagnostics = gpuPreview?.getGrainDiagnostics() ?? {
+    state: gpuPreviewAttempted ? "CPU fallback" : "cold",
+    prewarm: null,
+    firstActivation: null,
+    sliderUpdate: null,
+  };
   const filterActive = Boolean(edit.filter && edit.strength > 0);
   const exportTiming = diagnostics.exportTiming;
   const exportProcessorLabel = exportTiming.processor === "gpu"
@@ -208,13 +214,18 @@ function updateDiagnosticOverlay() {
     "Grain: " + edit.grain,
     "Light v2: " + (edit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (edit.color === 0 ? "off" : "active"),
-    "Grain engine: v5-band-limited " + (edit.grain === 0 ? "(off)" : "(active)"),
+    "Grain engine: v6 reference-calibrated " + (edit.grain === 0 ? "(off)" : "(active)"),
     "Reference grain scale: 960 px long edge",
-    "Band-pass scales: σ " + grainParameters.bandPassSmallSigma.toFixed(2)
-      + " / " + grainParameters.bandPassBroadSigma.toFixed(2) + " ref px",
+    "Profile A: " + grainParameters.profileA,
+    "Profile B: " + grainParameters.profileB,
+    "Current interpolation: " + grainParameters.profileInterpolation.toFixed(3),
     "RMS amplitude: " + grainParameters.rmsStops.toFixed(4) + " stops",
     "Roughness: " + grainParameters.roughness.toFixed(3),
     "Detail coupling: " + grainParameters.detailCoupling.toFixed(3),
+    "Grain resources: " + grainGpuDiagnostics.state,
+    "Grain prewarm submit: " + duration(grainGpuDiagnostics.prewarm),
+    "First activation submit: " + duration(grainGpuDiagnostics.firstActivation),
+    "Slider submit: " + duration(grainGpuDiagnostics.sliderUpdate),
     "Reference LF energy ratio: "
       + grainParameters.referenceLowFrequencyEnergyRatio.toFixed(4),
     "grainSeed: " + (photo ? photo.grainSeed : "—"),
@@ -505,6 +516,13 @@ async function prepareSource() {
     setStatus("照片已载入");
     if (DEBUG_MODE) updateDiagnosticOverlay();
     queuePreview();
+    const prewarm = () => {
+      if (token !== state.loadToken || !gpuPreview) return;
+      gpuPreview.prewarmGrain(photo.grainSeed);
+      if (DEBUG_MODE) updateDiagnosticOverlay();
+    };
+    if (window.requestIdleCallback) window.requestIdleCallback(prewarm, { timeout: 250 });
+    else window.setTimeout(prewarm, 0);
   } catch {
     if (token === state.loadToken) setStatus("照片载入失败，请换一张照片");
   }
@@ -929,7 +947,7 @@ if ("serviceWorker" in navigator) {
     markStartup("window load");
     window.requestAnimationFrame(() => window.setTimeout(async () => {
       try {
-        const registration = await navigator.serviceWorker.register("./sw.js?v=55", { scope: "./" });
+        const registration = await navigator.serviceWorker.register("./sw.js?v=56", { scope: "./" });
         markStartup("LUT preparation start");
         await prepareOfflineLutPack(registration);
       } catch (error) {

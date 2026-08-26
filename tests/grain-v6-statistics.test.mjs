@@ -2,22 +2,30 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  createBandLimitedGrainField,
+  createReferenceCalibratedGrainField,
+  GRAIN_REFERENCE_PROFILES,
   getGrainParameters,
   processPixels,
-  shapeBandLimitedGrain,
+  shapeReferenceGrain,
 } from "../lib/image-engine.js";
 
 const SIZE = 256;
 const SEED = 77881;
 
 function shapedField(grain = 100) {
-  const field = createBandLimitedGrainField(SIZE, SIZE, SEED);
+  const field = createReferenceCalibratedGrainField(SIZE, SIZE, SEED);
   const parameters = getGrainParameters(grain, SIZE, SIZE);
-  return Float64Array.from(
-    field.data,
-    (value) => shapeBandLimitedGrain(value, parameters.roughness),
-  );
+  const values = new Float64Array(SIZE * SIZE);
+  for (let pixel = 0; pixel < values.length; pixel += 1) {
+    const rawA = field.data[pixel * 2];
+    const rawB = field.data[pixel * 2 + 1];
+    const profileA = rawA + (shapeReferenceGrain(rawA, "A") - rawA) * parameters.tailMix;
+    const profileB = shapeReferenceGrain(rawB, "B");
+    values[pixel] = (
+      profileA + (profileB - profileA) * parameters.profileInterpolation
+    ) * parameters.blendNormalization;
+  }
+  return values;
 }
 
 function meanAndRms(values) {
@@ -227,41 +235,99 @@ function pixelOklab(r, g, b) {
   ];
 }
 
-test("Grain v5 field is normalized, band-limited, and isotropic", () => {
-  const values = shapedField(100);
-  const { mean, rms } = meanAndRms(values);
-  const spectrum = spectralMetrics(values);
-  assert.ok(Math.abs(mean) < 0.01);
-  assert.ok(rms > 0.97 && rms < 1.03);
-  assert.ok(spectrum.lowFrequencyRatio < 0.001);
-  assert.ok(spectrum.peakFrequency > 0.18 && spectrum.peakFrequency < 0.32);
-  assert.ok(spectrum.anisotropyRatio < 1.2);
+function flatPatchStopRms(gray, grain) {
+  const width = 128;
+  const height = 128;
+  const source = new Uint8ClampedArray(width * height * 4);
+  for (let offset = 0; offset < source.length; offset += 4) {
+    source.set([gray, gray, gray, 255], offset);
+  }
+  const result = processPixels(
+    { width, height, data: source },
+    { filter: null, strength: 100, brightness: 0, color: 0, grain },
+    SEED,
+  );
+  const original = srgbToLinear(gray);
+  const values = new Float64Array(width * height);
+  let mean = 0;
+  for (let pixel = 0; pixel < values.length; pixel += 1) {
+    values[pixel] = Math.log2(Math.max(1e-8, srgbToLinear(result[pixel * 4])) / original);
+    mean += values[pixel];
+  }
+  mean /= values.length;
+  let variance = 0;
+  for (const value of values) variance += (value - mean) ** 2;
+  return Math.sqrt(variance / values.length);
+}
+
+test("Grain v6 exports the measured reference profile calibration", () => {
+  assert.equal(GRAIN_REFERENCE_PROFILES.A.label, "黄油100 target");
+  assert.equal(GRAIN_REFERENCE_PROFILES.B.label, "Snapseed100 target");
+  assert.equal(GRAIN_REFERENCE_PROFILES.A.targetGrain, 50);
+  assert.equal(GRAIN_REFERENCE_PROFILES.B.targetGrain, 100);
+  assert.ok(Math.abs(GRAIN_REFERENCE_PROFILES.A.measuredRmsStops - 0.1987) < 1e-6);
+  assert.ok(Math.abs(GRAIN_REFERENCE_PROFILES.B.measuredRmsStops - 0.5454) < 1e-6);
+  assert.ok(GRAIN_REFERENCE_PROFILES.A.measuredMedianPeriodRefPx
+    < GRAIN_REFERENCE_PROFILES.B.measuredMedianPeriodRefPx);
 });
 
-test("Grain v5 autocorrelation decays within the microscopic band", () => {
-  const values = shapedField(100);
-  const horizontal = [1, 2, 3, 4].map((lag) => correlation(values, lag, 0));
-  const vertical = [1, 2, 3, 4].map((lag) => correlation(values, 0, lag));
-  const diagonal = [1, 2, 3, 4].map((lag) => correlation(values, lag, lag));
-  assert.ok(horizontal[0] > 0.1 && horizontal[0] < 0.45);
-  assert.ok(vertical[0] > 0.1 && vertical[0] < 0.45);
-  assert.ok(Math.abs(horizontal[0] - vertical[0]) < 0.08);
-  assert.ok(Math.abs(horizontal[3]) < 0.05);
-  assert.ok(Math.abs(vertical[3]) < 0.05);
-  assert.ok(Math.abs(diagonal[2]) < 0.05);
+test("Grain v6 Profile A and B match their distinct short-range correlation targets", () => {
+  const profileA = shapedField(50);
+  const profileB = shapedField(100);
+  const aHorizontal = correlation(profileA, 1, 0);
+  const aVertical = correlation(profileA, 0, 1);
+  const bHorizontal = correlation(profileB, 1, 0);
+  const bVertical = correlation(profileB, 0, 1);
+  assert.ok(aHorizontal > 0.09 && aHorizontal < 0.18);
+  assert.ok(aVertical > 0.09 && aVertical < 0.18);
+  assert.ok(bHorizontal > 0.36 && bHorizontal < 0.48);
+  assert.ok(bVertical > 0.36 && bVertical < 0.48);
+  assert.ok(bHorizontal > aHorizontal * 2.5);
+  assert.ok(Math.abs(aHorizontal - aVertical) < 0.04);
+  assert.ok(Math.abs(bHorizontal - bVertical) < 0.04);
+  assert.ok(Math.abs(correlation(profileA, 3, 0)) < 0.08);
+  assert.ok(Math.abs(correlation(profileB, 4, 0)) < 0.08);
 });
 
-test("Grain v5 strong excursions do not form large isolated blobs", () => {
+test("Grain v6 output amplitude anchors match the two reference targets", () => {
+  const profileA = flatPatchStopRms(128, 50);
+  const profileB = flatPatchStopRms(128, 100);
+  assert.ok(profileA > 0.18 && profileA < 0.23, `Profile A RMS ${profileA}`);
+  assert.ok(profileB > 0.43 && profileB < 0.53, `Profile B RMS ${profileB}`);
+  assert.ok(profileB > profileA * 2.1);
+});
+
+test("Grain v6 fields remain broad-spectrum, normalized, and isotropic", () => {
+  const profileA = shapedField(50);
+  const profileB = shapedField(100);
+  for (const values of [profileA, profileB]) {
+    const { mean, rms } = meanAndRms(values);
+    const spectrum = spectralMetrics(values);
+    assert.ok(Math.abs(mean) < 0.012);
+    assert.ok(rms > 0.97 && rms < 1.04);
+    assert.ok(spectrum.lowFrequencyRatio < 0.035);
+    assert.ok(
+      spectrum.anisotropyRatio < 1.25,
+      `anisotropy ${spectrum.anisotropyRatio.toFixed(4)}`,
+    );
+  }
+  const spectrumA = spectralMetrics(profileA);
+  const spectrumB = spectralMetrics(profileB);
+  assert.ok(spectrumA.peakFrequency > spectrumB.peakFrequency);
+  assert.ok(spectrumA.lowFrequencyRatio < spectrumB.lowFrequencyRatio);
+});
+
+test("Grain v6 strong excursions do not form large isolated blobs", () => {
   for (const grain of [50, 100]) {
-    const components = connectedComponents(shapedField(grain), 2);
+    const components = connectedComponents(shapedField(grain), 3);
     assert.ok(components.length > 100);
-    assert.ok(Math.max(...components.map(({ area }) => area)) <= 5);
-    assert.ok(Math.max(...components.map(({ diameter }) => diameter)) <= 4.5);
-    assert.equal(components.filter(({ area }) => area > 5).length, 0);
+    assert.ok(Math.max(...components.map(({ area }) => area)) <= 12);
+    assert.ok(Math.max(...components.map(({ diameter }) => diameter)) <= 8);
+    assert.ok(components.filter(({ area }) => area > 6).length < 4);
   }
 });
 
-test("Grain v5 preserves hue and average chroma on colored patches", () => {
+test("Grain v6 preserves hue and average chroma on colored patches", () => {
   const patches = [
     [220, 112, 35],
     [202, 145, 120],
@@ -303,8 +369,38 @@ test("Grain v5 preserves hue and average chroma on colored patches", () => {
         .some((channel) => channel === 0 || channel === 255)) clipped += 1;
     }
 
-    assert.ok(Math.abs(chromaDrift / (width * height)) < 0.001);
-    assert.ok(absoluteHueDrift / (width * height) < Math.PI / 180);
-    assert.equal(clipped, 0);
+    const averageChromaDrift = chromaDrift / (width * height);
+    const averageHueDrift = absoluteHueDrift / (width * height);
+    const clippingRate = clipped / (width * height);
+    assert.ok(
+      Math.abs(averageChromaDrift) < 0.006,
+      `${patch.join(",")} chroma drift ${averageChromaDrift}`,
+    );
+    assert.ok(
+      averageHueDrift < Math.PI / 180,
+      `${patch.join(",")} hue drift ${averageHueDrift}`,
+    );
+    assert.ok(clippingRate < 0.001, `${patch.join(",")} clipping ${clippingRate}`);
   }
+});
+
+test("Grain v6 slider interpolation is continuous, deterministic, and reversible", () => {
+  const before = shapedField(49);
+  const anchor = shapedField(50);
+  const after = shapedField(51);
+  let beforeDelta = 0;
+  let afterDelta = 0;
+  for (let index = 0; index < anchor.length; index += 1) {
+    beforeDelta += (anchor[index] - before[index]) ** 2;
+    afterDelta += (after[index] - anchor[index]) ** 2;
+  }
+  beforeDelta = Math.sqrt(beforeDelta / anchor.length);
+  afterDelta = Math.sqrt(afterDelta / anchor.length);
+  assert.ok(beforeDelta < 0.025);
+  assert.ok(afterDelta < 0.025);
+  assert.deepEqual(shapedField(20), shapedField(20));
+  assert.notDeepEqual(
+    createReferenceCalibratedGrainField(SIZE, SIZE, SEED).data,
+    createReferenceCalibratedGrainField(SIZE, SIZE, SEED + 1).data,
+  );
 });

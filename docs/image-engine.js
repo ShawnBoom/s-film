@@ -232,28 +232,64 @@ function applyColor(r, g, b, parameters) {
   return gamutMapOklab(L, a * factor, bValue * factor);
 }
 
-const GRAIN_SMALL_WEIGHTS = Object.freeze([
-  0.00001453,
-  0.00539458,
-  0.18785872,
-  0.61346435,
-  0.18785872,
-  0.00539458,
-  0.00001453,
+export const GRAIN_REFERENCE_PROFILES = Object.freeze({
+  A: Object.freeze({
+    label: "黄油100 target",
+    targetGrain: 50,
+    measuredRmsStops: 0.1987,
+    measuredRobustSigmaStops: 0.1695,
+    measuredKurtosis: 5.2434,
+    measuredLagOneCorrelation: 0.0588,
+    measuredMedianPeriodRefPx: 2.8254,
+    measuredLowFrequencyRatio: 0.0258,
+    measuredHighFrequencyRatio: 0.3796,
+    rmsStops: 0.2,
+    roughness: 0.18,
+    shapeNormalization: 1.48608837,
+    detailCoupling: 0.015,
+    shadowBoost: 0.4,
+  }),
+  B: Object.freeze({
+    label: "Snapseed100 target",
+    targetGrain: 100,
+    measuredRmsStops: 0.5454,
+    measuredRobustSigmaStops: 0.4058,
+    measuredKurtosis: 5.1961,
+    measuredLagOneCorrelation: 0.2704,
+    measuredMedianPeriodRefPx: 3.9151,
+    measuredLowFrequencyRatio: 0.0885,
+    measuredHighFrequencyRatio: 0.1418,
+    rmsStops: 0.44,
+    roughness: 0.14,
+    shapeNormalization: 1.39217813,
+    detailCoupling: 0,
+    shadowBoost: 0.55,
+  }),
+});
+
+const GRAIN_PROFILE_A_KERNEL = Object.freeze([
+  -0.00766237, -0.01195417, -0.028172, -0.01195417, -0.00766237,
+  -0.01195417, -0.00116834, 0.05752784, -0.00116834, -0.01195417,
+  -0.028172, 0.05752784, 1, 0.05752784, -0.028172,
+  -0.01195417, -0.00116834, 0.05752784, -0.00116834, -0.01195417,
+  -0.00766237, -0.01195417, -0.028172, -0.01195417, -0.00766237,
 ]);
 
-const GRAIN_BROAD_WEIGHTS = Object.freeze([
-  0.02153191,
-  0.09452136,
-  0.22961404,
-  0.30866539,
-  0.22961404,
-  0.09452136,
-  0.02153191,
+const GRAIN_PROFILE_B_KERNEL = Object.freeze([
+  -0.00923422, 0.00109766, -0.01609937, 0.00109766, -0.00923422,
+  0.00109766, 0.04243676, 0.23384847, 0.04243676, 0.00109766,
+  -0.01609937, 0.23384847, 1, 0.23384847, -0.01609937,
+  0.00109766, 0.04243676, 0.23384847, 0.04243676, 0.00109766,
+  -0.00923422, 0.00109766, -0.01609937, 0.00109766, -0.00923422,
 ]);
 
-const GRAIN_BAND_NORMALIZATION = 5.62214436;
-const GRAIN_FIELD_LIMIT = 3;
+const GRAIN_PROFILE_A_FIELD_NORMALIZATION = 1.00885824;
+const GRAIN_PROFILE_B_FIELD_NORMALIZATION = 1.10777083;
+const GRAIN_PROFILE_CORRELATION = 0.92762;
+const GRAIN_RAW_SHAPED_CORRELATION = 0.98;
+const GRAIN_EXCITATION_SCALE = Math.sqrt(3 / 4);
+const GRAIN_FIELD_CACHE_LIMIT = 2;
+const GRAIN_FIELD_CACHE = new Map();
 
 function grainHashState(x, y, seed) {
   let state = (Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ seed) >>> 0;
@@ -264,6 +300,15 @@ function grainHashState(x, y, seed) {
 
 function grainHashValue(x, y, seed) {
   return grainHashState(x, y, seed) / 4294967295 * 2 - 1;
+}
+
+function grainExcitation(x, y, seed) {
+  return (
+    grainHashValue(x, y, seed)
+    + grainHashValue(x, y, seed ^ 0x9e3779b9)
+    + grainHashValue(x, y, seed ^ 0x85ebca6b)
+    + grainHashValue(x, y, seed ^ 0xc2b2ae35)
+  ) * GRAIN_EXCITATION_SCALE;
 }
 
 function grainReferenceSize(width, height) {
@@ -277,98 +322,116 @@ function grainReferenceSize(width, height) {
 export function getGrainParameters(grain, width, height) {
   const amount = Math.max(0, Math.min(1, grain / 100));
   const referenceSize = grainReferenceSize(width, height);
+  const profileA = GRAIN_REFERENCE_PROFILES.A;
+  const profileB = GRAIN_REFERENCE_PROFILES.B;
+  const profileInterpolation = Math.max(0, Math.min(1, amount * 2 - 1));
+  const approachA = Math.min(1, amount * 2);
   if (amount === 0) {
     return {
       active: false,
-      engine: "v5-band-limited",
+      engine: "v6-reference-calibrated",
       amount: 0,
       referenceLongEdge: 960,
       coordinateScale: 0,
       referenceWidth: referenceSize.width,
       referenceHeight: referenceSize.height,
-      bandPassSmallSigma: 0.65,
-      bandPassBroadSigma: 1.3,
+      profileA: profileA.label,
+      profileB: profileB.label,
+      profileInterpolation: 0,
+      tailMix: 0,
+      blendNormalization: 1,
       rmsStops: 0,
       roughness: 0,
       detailCoupling: 0,
-      referenceLowFrequencyEnergyRatio: 0.0002,
+      shadowBoost: 0,
+      effectiveMedianPeriodRefPx: profileA.measuredMedianPeriodRefPx,
+      referenceLowFrequencyEnergyRatio: profileA.measuredLowFrequencyRatio,
     };
   }
 
+  const blendVariance = (1 - profileInterpolation) ** 2 + profileInterpolation ** 2
+    + 2 * GRAIN_PROFILE_CORRELATION * profileInterpolation * (1 - profileInterpolation);
+  const tailVariance = (1 - approachA) ** 2 + approachA ** 2
+    + 2 * GRAIN_RAW_SHAPED_CORRELATION * approachA * (1 - approachA);
+  const interpolation = profileInterpolation;
+  const rmsStops = amount <= 0.5
+    ? profileA.rmsStops * approachA ** 0.92
+    : profileA.rmsStops + (profileB.rmsStops - profileA.rmsStops) * interpolation;
+
   return {
     active: true,
-    engine: "v5-band-limited",
+    engine: "v6-reference-calibrated",
     amount,
     referenceLongEdge: 960,
     coordinateScale: Math.min(1, 960 / Math.max(1, width, height)),
     referenceWidth: referenceSize.width,
     referenceHeight: referenceSize.height,
-    bandPassSmallSigma: 0.65,
-    bandPassBroadSigma: 1.3,
-    rmsStops: 0.085 * amount ** 0.9,
-    roughness: 0.25 * amount ** 0.8,
-    detailCoupling: 0.035 * amount ** 1.5,
-    referenceLowFrequencyEnergyRatio: 0.0002,
+    profileA: profileA.label,
+    profileB: profileB.label,
+    profileInterpolation,
+    tailMix: approachA,
+    blendNormalization: 1 / Math.sqrt(
+      interpolation > 0 ? blendVariance : tailVariance
+    ),
+    rmsStops,
+    roughness: amount <= 0.5
+      ? profileA.roughness * approachA
+      : profileA.roughness + (profileB.roughness - profileA.roughness) * interpolation,
+    detailCoupling: amount <= 0.5
+      ? profileA.detailCoupling * approachA ** 1.25
+      : profileA.detailCoupling * (1 - interpolation),
+    shadowBoost: amount <= 0.5
+      ? profileA.shadowBoost * approachA
+      : profileA.shadowBoost + (profileB.shadowBoost - profileA.shadowBoost) * interpolation,
+    effectiveMedianPeriodRefPx: profileA.measuredMedianPeriodRefPx
+      + (profileB.measuredMedianPeriodRefPx - profileA.measuredMedianPeriodRefPx) * interpolation,
+    referenceLowFrequencyEnergyRatio: profileA.measuredLowFrequencyRatio
+      + (profileB.measuredLowFrequencyRatio - profileA.measuredLowFrequencyRatio) * interpolation,
   };
 }
 
-export function createBandLimitedGrainField(width, height, seed = 1) {
+export function createReferenceCalibratedGrainField(width, height, seed = 1) {
   const { width: referenceWidth, height: referenceHeight } = grainReferenceSize(width, height);
   const length = referenceWidth * referenceHeight;
-  const noise = new Float32Array(length);
-  const smallHorizontal = new Float32Array(length);
-  const broadHorizontal = new Float32Array(length);
-  const field = new Float32Array(length);
+  const excitation = new Float32Array(length);
+  const field = new Float32Array(length * 2);
 
   for (let y = 0; y < referenceHeight; y += 1) {
     for (let x = 0; x < referenceWidth; x += 1) {
-      noise[y * referenceWidth + x] = grainHashValue(x, y, seed);
-    }
-  }
-
-  for (let y = 0; y < referenceHeight; y += 1) {
-    const row = y * referenceWidth;
-    for (let x = 0; x < referenceWidth; x += 1) {
-      let small = 0;
-      let broad = 0;
-      for (let tap = -3; tap <= 3; tap += 1) {
-        const sampleX = Math.max(0, Math.min(referenceWidth - 1, x + tap));
-        const sample = noise[row + sampleX];
-        small += sample * GRAIN_SMALL_WEIGHTS[tap + 3];
-        broad += sample * GRAIN_BROAD_WEIGHTS[tap + 3];
-      }
-      smallHorizontal[row + x] = small;
-      broadHorizontal[row + x] = broad;
+      excitation[y * referenceWidth + x] = grainExcitation(x, y, seed);
     }
   }
 
   for (let y = 0; y < referenceHeight; y += 1) {
     for (let x = 0; x < referenceWidth; x += 1) {
-      let small = 0;
-      let broad = 0;
-      for (let tap = -3; tap <= 3; tap += 1) {
-        const sampleY = Math.max(0, Math.min(referenceHeight - 1, y + tap));
-        const index = sampleY * referenceWidth + x;
-        small += smallHorizontal[index] * GRAIN_SMALL_WEIGHTS[tap + 3];
-        broad += broadHorizontal[index] * GRAIN_BROAD_WEIGHTS[tap + 3];
+      let profileA = 0;
+      let profileB = 0;
+      for (let offsetY = -2; offsetY <= 2; offsetY += 1) {
+        const sampleY = Math.max(0, Math.min(referenceHeight - 1, y + offsetY));
+        for (let offsetX = -2; offsetX <= 2; offsetX += 1) {
+          const sampleX = Math.max(0, Math.min(referenceWidth - 1, x + offsetX));
+          const kernelIndex = (offsetY + 2) * 5 + offsetX + 2;
+          const sample = excitation[sampleY * referenceWidth + sampleX];
+          profileA += sample * GRAIN_PROFILE_A_KERNEL[kernelIndex];
+          profileB += sample * GRAIN_PROFILE_B_KERNEL[kernelIndex];
+        }
       }
-      field[y * referenceWidth + x] = Math.max(
-        -GRAIN_FIELD_LIMIT,
-        Math.min(GRAIN_FIELD_LIMIT, (small - broad) * GRAIN_BAND_NORMALIZATION),
-      );
+      const target = (y * referenceWidth + x) * 2;
+      field[target] = profileA / GRAIN_PROFILE_A_FIELD_NORMALIZATION;
+      field[target + 1] = profileB / GRAIN_PROFILE_B_FIELD_NORMALIZATION;
     }
   }
 
   return { width: referenceWidth, height: referenceHeight, data: field };
 }
 
-export function shapeBandLimitedGrain(value, roughness) {
-  const heavyTail = value + roughness * 0.06 * (value ** 3 - 3 * value);
-  const normalization = 1.0865 + 0.0608 * roughness;
-  return 2.8 * Math.tanh(heavyTail / 2.8) * normalization;
+export function shapeReferenceGrain(value, profile = "A") {
+  const parameters = GRAIN_REFERENCE_PROFILES[profile] ?? GRAIN_REFERENCE_PROFILES.A;
+  return 12 * Math.tanh((value + parameters.roughness * value ** 3) / 12)
+    / parameters.shapeNormalization;
 }
 
-function sampleBandLimitedGrain(field, x, y, outputWidth, outputHeight) {
+function sampleReferenceGrain(field, channel, x, y, outputWidth, outputHeight) {
   const fieldX = (x + 0.5) * field.width / outputWidth - 0.5;
   const fieldY = (y + 0.5) * field.height / outputHeight - 0.5;
   const x0 = Math.max(0, Math.min(field.width - 1, Math.floor(fieldX)));
@@ -377,11 +440,32 @@ function sampleBandLimitedGrain(field, x, y, outputWidth, outputHeight) {
   const y1 = Math.min(field.height - 1, y0 + 1);
   const mixX = clamp01(fieldX - x0);
   const mixY = clamp01(fieldY - y0);
-  const top = field.data[y0 * field.width + x0]
-    + (field.data[y0 * field.width + x1] - field.data[y0 * field.width + x0]) * mixX;
-  const bottom = field.data[y1 * field.width + x0]
-    + (field.data[y1 * field.width + x1] - field.data[y1 * field.width + x0]) * mixX;
+  const topLeft = (y0 * field.width + x0) * 2 + channel;
+  const topRight = (y0 * field.width + x1) * 2 + channel;
+  const bottomLeft = (y1 * field.width + x0) * 2 + channel;
+  const bottomRight = (y1 * field.width + x1) * 2 + channel;
+  const top = field.data[topLeft]
+    + (field.data[topRight] - field.data[topLeft]) * mixX;
+  const bottom = field.data[bottomLeft]
+    + (field.data[bottomRight] - field.data[bottomLeft]) * mixX;
   return top + (bottom - top) * mixY;
+}
+
+function getCachedReferenceGrainField(width, height, seed) {
+  const reference = grainReferenceSize(width, height);
+  const key = `${seed >>> 0}:${reference.width}x${reference.height}`;
+  if (GRAIN_FIELD_CACHE.has(key)) {
+    const field = GRAIN_FIELD_CACHE.get(key);
+    GRAIN_FIELD_CACHE.delete(key);
+    GRAIN_FIELD_CACHE.set(key, field);
+    return field;
+  }
+  const field = createReferenceCalibratedGrainField(width, height, seed);
+  GRAIN_FIELD_CACHE.set(key, field);
+  while (GRAIN_FIELD_CACHE.size > GRAIN_FIELD_CACHE_LIMIT) {
+    GRAIN_FIELD_CACHE.delete(GRAIN_FIELD_CACHE.keys().next().value);
+  }
+  return field;
 }
 
 function fillProcessedLuminanceRow(pixels, width, height, y, target) {
@@ -396,8 +480,8 @@ function fillProcessedLuminanceRow(pixels, width, height, y, target) {
   }
 }
 
-function applyBandLimitedGrain(output, width, height, parameters, seed) {
-  const field = createBandLimitedGrainField(width, height, seed);
+function applyReferenceCalibratedGrain(output, width, height, parameters, seed) {
+  const field = getCachedReferenceGrainField(width, height, seed);
   let previous = new Float32Array(width);
   let current = new Float32Array(width);
   let next = new Float32Array(width);
@@ -423,20 +507,22 @@ function applyBandLimitedGrain(output, width, height, parameters, seed) {
         0,
         luminance - fineDetail * parameters.detailCoupling,
       );
-      const fieldValue = shapeBandLimitedGrain(
-        sampleBandLimitedGrain(field, x, y, width, height),
-        parameters.roughness,
-      );
-      const signalResponse = 0.9
-        + 0.1 * Math.sqrt(clamp01(4 * luminance * (1 - luminance)));
-      const exposureStops = fieldValue * parameters.rmsStops * signalResponse;
-      const targetLuminance = Math.max(
-        0,
-        (integratedLuminance + 0.0015) * 2 ** exposureStops - 0.0015,
-      );
+      const rawA = sampleReferenceGrain(field, 0, x, y, width, height);
+      const rawB = sampleReferenceGrain(field, 1, x, y, width, height);
+      const profileA = rawA + (shapeReferenceGrain(rawA, "A") - rawA) * parameters.tailMix;
+      const profileB = shapeReferenceGrain(rawB, "B");
+      const fieldValue = (
+        profileA + (profileB - profileA) * parameters.profileInterpolation
+      ) * parameters.blendNormalization;
+      const signalResponse = 0.78
+        + parameters.shadowBoost * (1 - Math.sqrt(clamp01(luminance)));
+      const localRmsStops = parameters.rmsStops * signalResponse;
+      const exposureStops = fieldValue * localRmsStops
+        - 0.5 * Math.LN2 * localRmsStops ** 2;
+      const targetLuminance = integratedLuminance * 2 ** exposureStops;
       const maximum = Math.max(r, g, b);
       const requestedScale = targetLuminance / luminance;
-      const gamutScale = maximum > 1e-7 ? 1 / maximum : 1;
+      const gamutScale = maximum > 1e-7 ? 0.99 / maximum : 1;
       const scale = Math.max(0, Math.min(requestedScale, gamutScale));
 
       output[offset] = Math.round(linearToSrgb(r * scale) * 255);
@@ -512,7 +598,7 @@ export function processPixels(source, edit, seed = 1) {
   }
 
   if (grainParameters.active) {
-    applyBandLimitedGrain(output, width, height, grainParameters, seed);
+    applyReferenceCalibratedGrain(output, width, height, grainParameters, seed);
   }
 
   return output;

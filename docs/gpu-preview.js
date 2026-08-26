@@ -3,7 +3,7 @@ import {
   getFilterLut,
   getGrainParameters,
   getLightParameters,
-} from "./image-engine.js?v=55";
+} from "./image-engine.js?v=56";
 
 const VERTEX_SHADER = `#version 300 es
 layout(location = 0) in vec2 aPosition;
@@ -198,12 +198,13 @@ void main() {
 }
 `;
 
-const GRAIN_NOISE_FRAGMENT_SHADER = `#version 300 es
+const GRAIN_FIELD_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 precision highp int;
 
 out vec4 outColor;
 uniform uint uSeed;
+uniform ivec2 uSize;
 
 uint grainHashState(ivec2 point, uint seed) {
   uint value = uint(point.x) * 374761393u ^ uint(point.y) * 668265263u ^ seed;
@@ -212,83 +213,64 @@ uint grainHashState(ivec2 point, uint seed) {
   return value == 0u ? 0x6d2b79f5u : value;
 }
 
-void main() {
-  ivec2 point = ivec2(floor(gl_FragCoord.xy));
-  float excitation = float(grainHashState(point, uSeed)) / 4294967295.0;
-  outColor = vec4(excitation, 0.0, 0.0, 1.0);
-}
-`;
-
-const GRAIN_HORIZONTAL_FRAGMENT_SHADER = `#version 300 es
-precision highp float;
-precision highp int;
-
-out vec4 outColor;
-uniform sampler2D uInput;
-uniform ivec2 uSize;
-
-float smallWeight(int tap) {
-  if (tap == 0 || tap == 6) return 0.00001453;
-  if (tap == 1 || tap == 5) return 0.00539458;
-  if (tap == 2 || tap == 4) return 0.18785872;
-  return 0.61346435;
+float signedHash(ivec2 point, uint seed) {
+  return float(grainHashState(point, seed)) / 4294967295.0 * 2.0 - 1.0;
 }
 
-float broadWeight(int tap) {
-  if (tap == 0 || tap == 6) return 0.02153191;
-  if (tap == 1 || tap == 5) return 0.09452136;
-  if (tap == 2 || tap == 4) return 0.22961404;
-  return 0.30866539;
+float excitation(ivec2 point) {
+  return (
+    signedHash(point, uSeed)
+    + signedHash(point, uSeed ^ 0x9e3779b9u)
+    + signedHash(point, uSeed ^ 0x85ebca6bu)
+    + signedHash(point, uSeed ^ 0xc2b2ae35u)
+  ) * 0.8660254037844386;
 }
 
-void main() {
-  ivec2 point = ivec2(floor(gl_FragCoord.xy));
-  float small = 0.0;
-  float broad = 0.0;
-  for (int tap = -3; tap <= 3; tap += 1) {
-    ivec2 samplePoint = ivec2(clamp(point.x + tap, 0, uSize.x - 1), point.y);
-    float excitation = texelFetch(uInput, samplePoint, 0).r * 2.0 - 1.0;
-    small += excitation * smallWeight(tap + 3);
-    broad += excitation * broadWeight(tap + 3);
+float profileAWeight(ivec2 offset) {
+  ivec2 distance = abs(offset);
+  if (all(equal(distance, ivec2(0)))) return 1.0;
+  if (all(equal(distance, ivec2(1, 0))) || all(equal(distance, ivec2(0, 1)))) return 0.05752784;
+  if (all(equal(distance, ivec2(1)))) return -0.00116834;
+  if (all(equal(distance, ivec2(2, 0))) || all(equal(distance, ivec2(0, 2)))) return -0.02817200;
+  if ((distance.x == 2 && distance.y == 1) || (distance.x == 1 && distance.y == 2)) {
+    return -0.01195417;
   }
-  outColor = vec4(small * 0.5 + 0.5, broad * 0.5 + 0.5, 0.0, 1.0);
-}
-`;
-
-const GRAIN_VERTICAL_FRAGMENT_SHADER = `#version 300 es
-precision highp float;
-precision highp int;
-
-out vec4 outColor;
-uniform sampler2D uInput;
-uniform ivec2 uSize;
-
-float smallWeight(int tap) {
-  if (tap == 0 || tap == 6) return 0.00001453;
-  if (tap == 1 || tap == 5) return 0.00539458;
-  if (tap == 2 || tap == 4) return 0.18785872;
-  return 0.61346435;
+  return -0.00766237;
 }
 
-float broadWeight(int tap) {
-  if (tap == 0 || tap == 6) return 0.02153191;
-  if (tap == 1 || tap == 5) return 0.09452136;
-  if (tap == 2 || tap == 4) return 0.22961404;
-  return 0.30866539;
+float profileBWeight(ivec2 offset) {
+  ivec2 distance = abs(offset);
+  if (all(equal(distance, ivec2(0)))) return 1.0;
+  if (all(equal(distance, ivec2(1, 0))) || all(equal(distance, ivec2(0, 1)))) return 0.23384847;
+  if (all(equal(distance, ivec2(1)))) return 0.04243676;
+  if (all(equal(distance, ivec2(2, 0))) || all(equal(distance, ivec2(0, 2)))) return -0.01609937;
+  if ((distance.x == 2 && distance.y == 1) || (distance.x == 1 && distance.y == 2)) {
+    return 0.00109766;
+  }
+  return -0.00923422;
 }
 
 void main() {
   ivec2 point = ivec2(floor(gl_FragCoord.xy));
-  float small = 0.0;
-  float broad = 0.0;
-  for (int tap = -3; tap <= 3; tap += 1) {
-    ivec2 samplePoint = ivec2(point.x, clamp(point.y + tap, 0, uSize.y - 1));
-    vec2 horizontal = texelFetch(uInput, samplePoint, 0).rg * 2.0 - 1.0;
-    small += horizontal.r * smallWeight(tap + 3);
-    broad += horizontal.g * broadWeight(tap + 3);
+  float profileA = 0.0;
+  float profileB = 0.0;
+  for (int offsetY = -2; offsetY <= 2; offsetY += 1) {
+    for (int offsetX = -2; offsetX <= 2; offsetX += 1) {
+      ivec2 offset = ivec2(offsetX, offsetY);
+      ivec2 samplePoint = clamp(point + offset, ivec2(0), uSize - 1);
+      float sampleValue = excitation(samplePoint);
+      profileA += sampleValue * profileAWeight(offset);
+      profileB += sampleValue * profileBWeight(offset);
+    }
   }
-  float band = clamp((small - broad) * 5.62214436, -3.0, 3.0);
-  outColor = vec4(band / 6.0 + 0.5, 0.0, 0.0, 1.0);
+  profileA /= 1.00885824;
+  profileB /= 1.10777083;
+  outColor = vec4(
+    clamp(profileA / 9.0 + 0.5, 0.0, 1.0),
+    clamp(profileB / 9.0 + 0.5, 0.0, 1.0),
+    0.0,
+    1.0
+  );
 }
 `;
 
@@ -303,8 +285,11 @@ uniform sampler2D uProcessed;
 uniform sampler2D uGrain;
 uniform ivec2 uReferenceSize;
 uniform float uRmsStops;
-uniform float uRoughness;
+uniform float uProfileMix;
+uniform float uTailMix;
+uniform float uBlendNormalization;
 uniform float uDetailCoupling;
+uniform float uShadowBoost;
 
 vec3 srgbToLinear(vec3 value) {
   vec3 low = value / 12.92;
@@ -323,10 +308,8 @@ float luminanceAt(vec2 uv) {
   return dot(srgbToLinear(texture(uProcessed, uv).rgb), vec3(0.2126, 0.7152, 0.0722));
 }
 
-float shapeBandLimitedGrain(float value) {
-  float heavyTail = value + uRoughness * 0.06 * (value * value * value - 3.0 * value);
-  float normalization = 1.0865 + 0.0608 * uRoughness;
-  return 2.8 * tanh(heavyTail / 2.8) * normalization;
+float shapeReferenceGrain(float value, float roughness, float normalization) {
+  return 12.0 * tanh((value + roughness * value * value * value) / 12.0) / normalization;
 }
 
 void main() {
@@ -349,15 +332,19 @@ void main() {
   float fineDetail = luminance - microscopicBlur;
   float integratedLuminance = max(0.0, luminance - fineDetail * uDetailCoupling);
 
-  float field = (texture(uGrain, vUv).r - 0.5) * 6.0;
-  field = shapeBandLimitedGrain(field);
-  float signalResponse = 0.9 + 0.1 * sqrt(clamp(4.0 * luminance * (1.0 - luminance), 0.0, 1.0));
-  float exposureStops = field * uRmsStops * signalResponse;
-  float targetLuminance = max(0.0, (integratedLuminance + 0.0015) * exp2(exposureStops) - 0.0015);
+  vec2 rawProfiles = (texture(uGrain, vUv).rg - 0.5) * 9.0;
+  float shapedA = shapeReferenceGrain(rawProfiles.r, 0.18, 1.48608837);
+  float shapedB = shapeReferenceGrain(rawProfiles.g, 0.14, 1.39217813);
+  float profileA = mix(rawProfiles.r, shapedA, uTailMix);
+  float field = mix(profileA, shapedB, uProfileMix) * uBlendNormalization;
+  float signalResponse = 0.78 + uShadowBoost * (1.0 - sqrt(clamp(luminance, 0.0, 1.0)));
+  float localRmsStops = uRmsStops * signalResponse;
+  float exposureStops = field * localRmsStops - 0.34657359028 * localRmsStops * localRmsStops;
+  float targetLuminance = integratedLuminance * exp2(exposureStops);
 
   float maximum = max(rgb.r, max(rgb.g, rgb.b));
   float requestedScale = targetLuminance / luminance;
-  float gamutScale = maximum > 0.0000001 ? 1.0 / maximum : 1.0;
+  float gamutScale = maximum > 0.0000001 ? 0.99 / maximum : 1.0;
   float scale = max(0.0, min(requestedScale, gamutScale));
   outColor = vec4(linearToSrgb(rgb * scale), processed.a);
 }
@@ -416,15 +403,11 @@ class GpuPreviewRenderer {
     this.canvas = canvas;
     this.gl = gl;
     this.program = createProgram(gl, COLOR_FRAGMENT_SHADER);
-    this.noiseProgram = createProgram(gl, GRAIN_NOISE_FRAGMENT_SHADER);
-    this.horizontalProgram = createProgram(gl, GRAIN_HORIZONTAL_FRAGMENT_SHADER);
-    this.verticalProgram = createProgram(gl, GRAIN_VERTICAL_FRAGMENT_SHADER);
+    this.fieldProgram = createProgram(gl, GRAIN_FIELD_FRAGMENT_SHADER);
     this.composeProgram = createProgram(gl, GRAIN_COMPOSE_FRAGMENT_SHADER);
     this.sourceTexture = gl.createTexture();
     this.lutTexture = gl.createTexture();
     this.processedTexture = gl.createTexture();
-    this.noiseTexture = gl.createTexture();
-    this.horizontalTexture = gl.createTexture();
     this.grainTexture = gl.createTexture();
     this.intermediateFramebuffer = gl.createFramebuffer();
     this.vertexArray = gl.createVertexArray();
@@ -433,12 +416,16 @@ class GpuPreviewRenderer {
     this.hasSource = false;
     this.presentationFramebuffer = null;
     this.grainCacheKey = "";
+    this.processedSizeKey = "";
+    this.grainResourceState = "cold";
+    this.grainPrewarmDuration = null;
+    this.grainFirstActivationDuration = null;
+    this.grainSliderUpdateDuration = null;
+    this.grainHasActivated = false;
 
     if (!this.sourceTexture
       || !this.lutTexture
       || !this.processedTexture
-      || !this.noiseTexture
-      || !this.horizontalTexture
       || !this.grainTexture
       || !this.intermediateFramebuffer
       || !this.vertexArray
@@ -470,24 +457,20 @@ class GpuPreviewRenderer {
       colorBoost: location(gl, this.program, "uColorBoost"),
       colorFade: location(gl, this.program, "uColorFade"),
     };
-    this.noiseUniforms = {
-      seed: location(gl, this.noiseProgram, "uSeed"),
-    };
-    this.horizontalUniforms = {
-      input: location(gl, this.horizontalProgram, "uInput"),
-      size: location(gl, this.horizontalProgram, "uSize"),
-    };
-    this.verticalUniforms = {
-      input: location(gl, this.verticalProgram, "uInput"),
-      size: location(gl, this.verticalProgram, "uSize"),
+    this.fieldUniforms = {
+      seed: location(gl, this.fieldProgram, "uSeed"),
+      size: location(gl, this.fieldProgram, "uSize"),
     };
     this.composeUniforms = {
       processed: location(gl, this.composeProgram, "uProcessed"),
       grain: location(gl, this.composeProgram, "uGrain"),
       referenceSize: location(gl, this.composeProgram, "uReferenceSize"),
       rmsStops: location(gl, this.composeProgram, "uRmsStops"),
-      roughness: location(gl, this.composeProgram, "uRoughness"),
+      profileMix: location(gl, this.composeProgram, "uProfileMix"),
+      tailMix: location(gl, this.composeProgram, "uTailMix"),
+      blendNormalization: location(gl, this.composeProgram, "uBlendNormalization"),
       detailCoupling: location(gl, this.composeProgram, "uDetailCoupling"),
+      shadowBoost: location(gl, this.composeProgram, "uShadowBoost"),
     };
 
     gl.uniform1i(this.uniforms.source, 0);
@@ -512,10 +495,6 @@ class GpuPreviewRenderer {
       new Float32Array([0, 0, 0, 1]),
     );
     gl.uniform1i(this.uniforms.lutSize, 1);
-    gl.useProgram(this.horizontalProgram);
-    gl.uniform1i(this.horizontalUniforms.input, 0);
-    gl.useProgram(this.verticalProgram);
-    gl.uniform1i(this.verticalUniforms.input, 0);
     gl.useProgram(this.composeProgram);
     gl.uniform1i(this.composeUniforms.processed, 0);
     gl.uniform1i(this.composeUniforms.grain, 1);
@@ -549,6 +528,12 @@ class GpuPreviewRenderer {
     );
     this.hasSource = true;
     this.grainCacheKey = "";
+    this.processedSizeKey = "";
+    this.grainResourceState = "cold";
+    this.grainPrewarmDuration = null;
+    this.grainFirstActivationDuration = null;
+    this.grainSliderUpdateDuration = null;
+    this.grainHasActivated = false;
   }
 
   setFilter(filter) {
@@ -634,11 +619,19 @@ class GpuPreviewRenderer {
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
   }
 
+  ensureProcessedTarget() {
+    const sizeKey = `${this.canvas.width}x${this.canvas.height}`;
+    if (sizeKey === this.processedSizeKey) return;
+    const { gl } = this;
+    gl.activeTexture(gl.TEXTURE2);
+    this.allocateTexture(this.processedTexture, this.canvas.width, this.canvas.height, gl.LINEAR);
+    this.processedSizeKey = sizeKey;
+  }
+
   renderColor(edit, showOriginal, targetTexture = null) {
     const { gl } = this;
     if (targetTexture) {
-      gl.activeTexture(gl.TEXTURE2);
-      this.allocateTexture(targetTexture, this.canvas.width, this.canvas.height, gl.LINEAR);
+      this.ensureProcessedTarget();
       this.bindIntermediateTarget(targetTexture, this.canvas.width, this.canvas.height);
     } else {
       this.bindPresentationTarget();
@@ -670,33 +663,32 @@ class GpuPreviewRenderer {
     const height = grain.referenceHeight;
     const cacheKey = `${seed >>> 0}:${width}x${height}`;
     if (cacheKey === this.grainCacheKey) return;
+    const startedAt = performance.now();
+    this.grainResourceState = "warming";
 
     gl.activeTexture(gl.TEXTURE2);
-    this.allocateTexture(this.noiseTexture, width, height, gl.NEAREST);
-    this.allocateTexture(this.horizontalTexture, width, height, gl.NEAREST);
     this.allocateTexture(this.grainTexture, width, height, gl.LINEAR);
 
-    this.bindIntermediateTarget(this.noiseTexture, width, height);
-    gl.useProgram(this.noiseProgram);
-    gl.bindVertexArray(this.vertexArray);
-    gl.uniform1ui(this.noiseUniforms.seed, seed >>> 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    this.bindIntermediateTarget(this.horizontalTexture, width, height);
-    gl.useProgram(this.horizontalProgram);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.noiseTexture);
-    gl.uniform2i(this.horizontalUniforms.size, width, height);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-
     this.bindIntermediateTarget(this.grainTexture, width, height);
-    gl.useProgram(this.verticalProgram);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.horizontalTexture);
-    gl.uniform2i(this.verticalUniforms.size, width, height);
+    gl.useProgram(this.fieldProgram);
+    gl.bindVertexArray(this.vertexArray);
+    gl.uniform1ui(this.fieldUniforms.seed, seed >>> 0);
+    gl.uniform2i(this.fieldUniforms.size, width, height);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     this.grainCacheKey = cacheKey;
+    this.grainResourceState = "ready";
+    this.grainPrewarmDuration = performance.now() - startedAt;
+  }
+
+  prewarmGrain(seed) {
+    if (!this.hasSource) return false;
+    const grain = getGrainParameters(100, this.canvas.width, this.canvas.height);
+    this.ensureProcessedTarget();
+    this.ensureGrainField(seed, grain);
+    this.bindPresentationTarget();
+    this.gl.flush();
+    return true;
   }
 
   renderGrain(grain) {
@@ -714,8 +706,11 @@ class GpuPreviewRenderer {
       grain.referenceHeight,
     );
     gl.uniform1f(this.composeUniforms.rmsStops, grain.rmsStops);
-    gl.uniform1f(this.composeUniforms.roughness, grain.roughness);
+    gl.uniform1f(this.composeUniforms.profileMix, grain.profileInterpolation);
+    gl.uniform1f(this.composeUniforms.tailMix, grain.tailMix);
+    gl.uniform1f(this.composeUniforms.blendNormalization, grain.blendNormalization);
     gl.uniform1f(this.composeUniforms.detailCoupling, grain.detailCoupling);
+    gl.uniform1f(this.composeUniforms.shadowBoost, grain.shadowBoost);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
@@ -731,9 +726,25 @@ class GpuPreviewRenderer {
       return;
     }
 
+    const startedAt = performance.now();
     this.renderColor(edit, false, this.processedTexture);
     this.ensureGrainField(seed, grain);
     this.renderGrain(grain);
+    const duration = performance.now() - startedAt;
+    this.grainSliderUpdateDuration = duration;
+    if (!this.grainHasActivated) {
+      this.grainHasActivated = true;
+      this.grainFirstActivationDuration = duration;
+    }
+  }
+
+  getGrainDiagnostics() {
+    return {
+      state: this.grainResourceState,
+      prewarm: this.grainPrewarmDuration,
+      firstActivation: this.grainFirstActivationDuration,
+      sliderUpdate: this.grainSliderUpdateDuration,
+    };
   }
 
   destroy() {
@@ -741,16 +752,12 @@ class GpuPreviewRenderer {
     gl.deleteTexture(this.sourceTexture);
     gl.deleteTexture(this.lutTexture);
     gl.deleteTexture(this.processedTexture);
-    gl.deleteTexture(this.noiseTexture);
-    gl.deleteTexture(this.horizontalTexture);
     gl.deleteTexture(this.grainTexture);
     gl.deleteFramebuffer(this.intermediateFramebuffer);
     gl.deleteBuffer(this.positionBuffer);
     gl.deleteVertexArray(this.vertexArray);
     gl.deleteProgram(this.program);
-    gl.deleteProgram(this.noiseProgram);
-    gl.deleteProgram(this.horizontalProgram);
-    gl.deleteProgram(this.verticalProgram);
+    gl.deleteProgram(this.fieldProgram);
     gl.deleteProgram(this.composeProgram);
   }
 }
