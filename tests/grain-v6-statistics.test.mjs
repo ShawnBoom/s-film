@@ -260,7 +260,7 @@ function flatPatchStopRms(gray, grain) {
   return Math.sqrt(variance / values.length);
 }
 
-test("Grain v6 exports the measured reference profile calibration", () => {
+test("Grain v6.1 preserves the measured reference definitions", () => {
   assert.equal(GRAIN_REFERENCE_PROFILES.A.label, "黄油100 target");
   assert.equal(GRAIN_REFERENCE_PROFILES.B.label, "Snapseed100 target");
   assert.equal(GRAIN_REFERENCE_PROFILES.A.targetGrain, 50);
@@ -271,33 +271,36 @@ test("Grain v6 exports the measured reference profile calibration", () => {
     < GRAIN_REFERENCE_PROFILES.B.measuredMedianPeriodRefPx);
 });
 
-test("Grain v6 Profile A and B match their distinct short-range correlation targets", () => {
+test("Grain v6.1 shortens correlation while preserving photographic texture", () => {
   const profileA = shapedField(50);
   const profileB = shapedField(100);
   const aHorizontal = correlation(profileA, 1, 0);
   const aVertical = correlation(profileA, 0, 1);
   const bHorizontal = correlation(profileB, 1, 0);
   const bVertical = correlation(profileB, 0, 1);
-  assert.ok(aHorizontal > 0.09 && aHorizontal < 0.18);
-  assert.ok(aVertical > 0.09 && aVertical < 0.18);
-  assert.ok(bHorizontal > 0.36 && bHorizontal < 0.48);
-  assert.ok(bVertical > 0.36 && bVertical < 0.48);
-  assert.ok(bHorizontal > aHorizontal * 2.5);
+  assert.ok(aHorizontal > 0.04 && aHorizontal < 0.1);
+  assert.ok(aVertical > 0.04 && aVertical < 0.1);
+  assert.ok(bHorizontal > 0.13 && bHorizontal < 0.23);
+  assert.ok(bVertical > 0.13 && bVertical < 0.23);
+  assert.ok(bHorizontal > aHorizontal * 2);
+  assert.ok(aHorizontal < 0.111764 * 0.8);
+  assert.ok(bHorizontal < 0.402828 * 0.6);
   assert.ok(Math.abs(aHorizontal - aVertical) < 0.04);
   assert.ok(Math.abs(bHorizontal - bVertical) < 0.04);
   assert.ok(Math.abs(correlation(profileA, 3, 0)) < 0.08);
   assert.ok(Math.abs(correlation(profileB, 4, 0)) < 0.08);
 });
 
-test("Grain v6 output amplitude anchors match the two reference targets", () => {
+test("Grain v6.1 output amplitude remains strong without the old upper-half surge", () => {
   const profileA = flatPatchStopRms(128, 50);
   const profileB = flatPatchStopRms(128, 100);
   assert.ok(profileA > 0.18 && profileA < 0.23, `Profile A RMS ${profileA}`);
-  assert.ok(profileB > 0.43 && profileB < 0.53, `Profile B RMS ${profileB}`);
-  assert.ok(profileB > profileA * 2.1);
+  assert.ok(profileB > 0.32 && profileB < 0.4, `Profile B RMS ${profileB}`);
+  assert.ok(profileB > profileA * 1.6);
+  assert.ok(profileB < profileA * 2);
 });
 
-test("Grain v6 fields remain broad-spectrum, normalized, and isotropic", () => {
+test("Grain v6.1 fields remain broad-spectrum, normalized, and isotropic", () => {
   const profileA = shapedField(50);
   const profileB = shapedField(100);
   for (const values of [profileA, profileB]) {
@@ -317,17 +320,17 @@ test("Grain v6 fields remain broad-spectrum, normalized, and isotropic", () => {
   assert.ok(spectrumA.lowFrequencyRatio < spectrumB.lowFrequencyRatio);
 });
 
-test("Grain v6 strong excursions do not form large isolated blobs", () => {
+test("Grain v6.1 strong excursions do not form large blocks", () => {
   for (const grain of [50, 100]) {
     const components = connectedComponents(shapedField(grain), 3);
     assert.ok(components.length > 100);
-    assert.ok(Math.max(...components.map(({ area }) => area)) <= 12);
-    assert.ok(Math.max(...components.map(({ diameter }) => diameter)) <= 8);
-    assert.ok(components.filter(({ area }) => area > 6).length < 4);
+    assert.ok(Math.max(...components.map(({ area }) => area)) <= 4);
+    assert.ok(Math.max(...components.map(({ diameter }) => diameter)) <= 4);
+    assert.equal(components.filter(({ area }) => area > 4).length, 0);
   }
 });
 
-test("Grain v6 preserves hue and average chroma on colored patches", () => {
+test("Grain v6.1 preserves hue and average chroma on colored patches", () => {
   const patches = [
     [220, 112, 35],
     [202, 145, 120],
@@ -384,7 +387,7 @@ test("Grain v6 preserves hue and average chroma on colored patches", () => {
   }
 });
 
-test("Grain v6 slider interpolation is continuous, deterministic, and reversible", () => {
+test("Grain v6.1 slider interpolation is continuous, deterministic, and reversible", () => {
   const before = shapedField(49);
   const anchor = shapedField(50);
   const after = shapedField(51);

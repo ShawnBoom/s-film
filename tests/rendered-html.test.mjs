@@ -302,21 +302,21 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=56"/);
-  assert.match(staticHtml, /href="\.\/styles\.css\?v=56"/);
-  assert.match(staticApp, /from "\.\/image-engine\.js\?v=56"/);
-  assert.match(staticApp, /from "\.\/lut-loader\.js\?v=56"/);
-  assert.match(staticWorker, /see-core-v56/);
+  assert.match(staticHtml, /type="module" src="\.\/app\.js\?v=57"/);
+  assert.match(staticHtml, /href="\.\/styles\.css\?v=57"/);
+  assert.match(staticApp, /from "\.\/image-engine\.js\?v=57"/);
+  assert.match(staticApp, /from "\.\/lut-loader\.js\?v=57"/);
+  assert.match(staticWorker, /see-core-v57/);
   assert.match(staticPackWorker, /see-luts-v52/);
   assert.match(staticPackWorker, /see-luts-bin-v/);
-  assert.match(staticWorker, /gpu-preview\.js\?v=56/);
-  assert.match(staticWorker, /gpu-export\.js\?v=56/);
+  assert.match(staticWorker, /gpu-preview\.js\?v=57/);
+  assert.match(staticWorker, /gpu-export\.js\?v=57/);
   assert.doesNotMatch(staticWorker, /gpu-export-benchmark/);
-  assert.match(staticWorker, /export-processor\.js\?v=56/);
-  assert.match(staticWorker, /export-worker\.js\?v=56/);
-  assert.match(staticWorker, /image-engine\.js\?v=56/);
-  assert.match(staticWorker, /edit-state\.js\?v=56/);
-  assert.match(staticWorker, /lut-loader\.js\?v=56/);
+  assert.match(staticWorker, /export-processor\.js\?v=57/);
+  assert.match(staticWorker, /export-worker\.js\?v=57/);
+  assert.match(staticWorker, /image-engine\.js\?v=57/);
+  assert.match(staticWorker, /edit-state\.js\?v=57/);
+  assert.match(staticWorker, /lut-loader\.js\?v=57/);
   const coreShell = staticWorker.match(/const CORE_APP_SHELL = \[([\s\S]*?)\n\];/)?.[1] ?? "";
   assert.doesNotMatch(coreShell, /s(?:0[1-9]|1[0-4])-[^"']+-lut\.js/);
   assert.doesNotMatch(coreShell, /luts-bin\/v1\/[^"']+\.bin/);
@@ -331,8 +331,8 @@ test("ships cache-busted, relative GitHub Pages assets", async () => {
   assert.match(staticPackWorker, /preparationPromise/);
   assert.match(staticPackWorker, /Math\.min\(2, missing\.length\)/);
   assert.match(staticWorker, /see-welcome\.png/);
-  assert.match(appWorker, /see-core-v56/);
-  assert.match(appWorker, /see-runtime-v56/);
+  assert.match(appWorker, /see-core-v57/);
+  assert.match(appWorker, /see-runtime-v57/);
   assert.match(appWorker, /see-welcome\.png/);
 });
 
@@ -381,24 +381,24 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(engine, /export function getColorParameters/);
   assert.match(engine, /export function getGrainParameters/);
   assert.match(engine, /960 \/ Math\.max\(1, width, height\)/);
-  assert.match(engine, /engine: "v6-reference-calibrated"/);
+  assert.match(engine, /engine: "v6\.1-refined"/);
   assert.match(engine, /label: "黄油100 target"/);
   assert.match(engine, /label: "Snapseed100 target"/);
   assert.match(engine, /rmsStops: 0\.2/);
-  assert.match(engine, /rmsStops: 0\.44/);
+  assert.match(engine, /rmsStops: 0\.34/);
   assert.match(engine, /detailCoupling: 0\.015/);
   assert.doesNotMatch(engine, /acutanceRecovery|correlatedExcitation|primaryScale/);
   assert.doesNotMatch(engine, /chromaAmount|chromaA|chromaB/);
 
   for (const sharedConstant of [
-    "0.05752784",
-    "-0.00116834",
-    "-0.028172",
-    "0.23384847",
-    "0.04243676",
-    "-0.01609937",
-    "1.00885824",
-    "1.10777083",
+    "0.035",
+    "-0.004",
+    "-0.015",
+    "0.095",
+    "0.008",
+    "-0.018",
+    "1.00308923",
+    "1.01882481",
     "1.48608837",
     "1.39217813",
   ]) {
@@ -413,8 +413,8 @@ test("uses independent GPU preview and GPU-primary full-resolution export with C
   assert.match(staticApp, /await attemptGpuFullResolutionExport/);
   assert.match(staticApp, /await ensureExportProcessor\(\)\.process\(source, photo\.edit, photo\.grainSeed\)/);
   assert.match(staticApp, /processPixels\(source, photo\.edit, photo\.grainSeed\)/);
-  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=56"/);
-  assert.match(exportWorker, /import \{ loadFilterLut \} from "\.\/lut-loader\.js\?v=56"/);
+  assert.match(exportWorker, /import \{ processPixels \} from "\.\/image-engine\.js\?v=57"/);
+  assert.match(exportWorker, /import \{ loadFilterLut \} from "\.\/lut-loader\.js\?v=57"/);
   assert.match(exportWorker, /await loadFilterLut\(message\.edit\?\.filter\)/);
   assert.match(exportWorker, /const pixels = processPixels\(source, message\.edit, message\.seed\)/);
 
@@ -453,7 +453,7 @@ test("shows actual preview and production export diagnostics only for debug quer
   assert.match(staticApp, /GPU fallback:/);
   assert.match(staticApp, /Light v2:/);
   assert.match(staticApp, /Color v2\.1:/);
-  assert.match(staticApp, /Grain engine: v6 reference-calibrated/);
+  assert.match(staticApp, /Grain engine: v6\.1 refined/);
   assert.match(staticApp, /Reference grain scale: 960 px long edge/);
   assert.match(staticApp, /Profile A:/);
   assert.match(staticApp, /Profile B:/);

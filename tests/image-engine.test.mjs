@@ -189,13 +189,13 @@ test("Color v2.1 reaches perceptual grayscale at -100", () => {
   }
 });
 
-test("Grain v6 anchors Grain 50 and 100 to the measured reference profiles", () => {
+test("Grain v6.1 keeps the reference endpoints while balancing slider response", () => {
   const values = [15, 25, 49, 50, 51, 75, 100].map((grain) =>
     getGrainParameters(grain, 4032, 3024));
   for (let index = 1; index < values.length; index += 1) {
     assert.ok(values[index].rmsStops > values[index - 1].rmsStops);
     assert.equal(values[index].referenceLongEdge, 960);
-    assert.equal(values[index].engine, "v6-reference-calibrated");
+    assert.equal(values[index].engine, "v6.1-refined");
   }
   const profileA = values[3];
   const profileB = values[6];
@@ -207,7 +207,7 @@ test("Grain v6 anchors Grain 50 and 100 to the measured reference profiles", () 
   assert.equal(profileA.roughness, 0.18);
   assert.equal(profileA.detailCoupling, 0.015);
   assert.equal(profileB.profileInterpolation, 1);
-  assert.equal(profileB.rmsStops, 0.44);
+  assert.equal(profileB.rmsStops, 0.34);
   assert.equal(profileB.roughness, 0.14);
   assert.equal(profileB.detailCoupling, 0);
   assert.ok(values[4].rmsStops - profileA.rmsStops < 0.005);
@@ -216,6 +216,18 @@ test("Grain v6 anchors Grain 50 and 100 to the measured reference profiles", () 
   assert.equal(disabled.active, false);
   assert.equal(disabled.rmsStops, 0);
   assert.equal(disabled.detailCoupling, 0);
+});
+
+test("Grain v6.1 strength is monotonic and perceptually distributed", () => {
+  const anchors = [0, 10, 25, 50, 75, 100].map((grain) =>
+    getGrainParameters(grain, 4032, 3024).rmsStops);
+  assert.deepEqual(anchors, [0, 0.05, 0.11, 0.2, 0.29, 0.34]);
+  for (let index = 1; index < anchors.length; index += 1) {
+    assert.ok(anchors[index] > anchors[index - 1]);
+  }
+  assert.ok(anchors[3] / anchors[5] > 0.55);
+  assert.ok(anchors[4] / anchors[5] > 0.8);
+  assert.ok(anchors[5] - anchors[3] < anchors[3] - anchors[0]);
 });
 
 test("Grain v6 is luminance-oriented and approximately exposure-neutral", () => {
@@ -259,7 +271,7 @@ test("Grain v6 keeps its 960px reference coordinate system resolution-independen
   assert.equal(landscape.referenceHeight, 540);
 });
 
-test("Grain v6 Profile A produces short-range correlated texture without persistence", () => {
+test("Grain v6.1 Profile A stays fine-grained without becoming pixel noise", () => {
   const width = 960;
   const height = 192;
   const gray = new Uint8ClampedArray(width * height * 4);
@@ -298,8 +310,8 @@ test("Grain v6 Profile A produces short-range correlated texture without persist
   variance /= neighborCount;
   const horizontalCorrelation = horizontal / neighborCount / variance;
   const verticalCorrelation = vertical / neighborCount / variance;
-  assert.ok(horizontalCorrelation > 0.1 && horizontalCorrelation < 0.45);
-  assert.ok(verticalCorrelation > 0.1 && verticalCorrelation < 0.45);
+  assert.ok(horizontalCorrelation > 0.04 && horizontalCorrelation < 0.12);
+  assert.ok(verticalCorrelation > 0.04 && verticalCorrelation < 0.12);
   assert.ok(Math.abs(horizontalCorrelation - verticalCorrelation) < 0.08);
 });
 

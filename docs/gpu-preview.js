@@ -3,7 +3,7 @@ import {
   getFilterLut,
   getGrainParameters,
   getLightParameters,
-} from "./image-engine.js?v=56";
+} from "./image-engine.js?v=57";
 
 const VERTEX_SHADER = `#version 300 es
 layout(location = 0) in vec2 aPosition;
@@ -229,25 +229,25 @@ float excitation(ivec2 point) {
 float profileAWeight(ivec2 offset) {
   ivec2 distance = abs(offset);
   if (all(equal(distance, ivec2(0)))) return 1.0;
-  if (all(equal(distance, ivec2(1, 0))) || all(equal(distance, ivec2(0, 1)))) return 0.05752784;
-  if (all(equal(distance, ivec2(1)))) return -0.00116834;
-  if (all(equal(distance, ivec2(2, 0))) || all(equal(distance, ivec2(0, 2)))) return -0.02817200;
+  if (all(equal(distance, ivec2(1, 0))) || all(equal(distance, ivec2(0, 1)))) return 0.035;
+  if (all(equal(distance, ivec2(1)))) return -0.004;
+  if (all(equal(distance, ivec2(2, 0))) || all(equal(distance, ivec2(0, 2)))) return -0.015;
   if ((distance.x == 2 && distance.y == 1) || (distance.x == 1 && distance.y == 2)) {
-    return -0.01195417;
+    return -0.006;
   }
-  return -0.00766237;
+  return -0.003;
 }
 
 float profileBWeight(ivec2 offset) {
   ivec2 distance = abs(offset);
   if (all(equal(distance, ivec2(0)))) return 1.0;
-  if (all(equal(distance, ivec2(1, 0))) || all(equal(distance, ivec2(0, 1)))) return 0.23384847;
-  if (all(equal(distance, ivec2(1)))) return 0.04243676;
-  if (all(equal(distance, ivec2(2, 0))) || all(equal(distance, ivec2(0, 2)))) return -0.01609937;
+  if (all(equal(distance, ivec2(1, 0))) || all(equal(distance, ivec2(0, 1)))) return 0.095;
+  if (all(equal(distance, ivec2(1)))) return 0.008;
+  if (all(equal(distance, ivec2(2, 0))) || all(equal(distance, ivec2(0, 2)))) return -0.018;
   if ((distance.x == 2 && distance.y == 1) || (distance.x == 1 && distance.y == 2)) {
-    return 0.00109766;
+    return -0.006;
   }
-  return -0.00923422;
+  return -0.004;
 }
 
 void main() {
@@ -263,8 +263,8 @@ void main() {
       profileB += sampleValue * profileBWeight(offset);
     }
   }
-  profileA /= 1.00885824;
-  profileB /= 1.10777083;
+  profileA /= 1.00308923;
+  profileB /= 1.01882481;
   outColor = vec4(
     clamp(profileA / 9.0 + 0.5, 0.0, 1.0),
     clamp(profileB / 9.0 + 0.5, 0.0, 1.0),
