@@ -1,4 +1,4 @@
-import { getFilterLut, registerFilterLut } from "./image-engine.js?v=53";
+import { getFilterLut, registerFilterLut } from "./image-engine.js?v=54";
 
 export const FILTER_LUT_MANIFEST = Object.freeze({
   classic: Object.freeze({ module: "s01-classic-neg-lut.js", size: 33 }),

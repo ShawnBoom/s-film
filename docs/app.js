@@ -1,9 +1,9 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=53";
-import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=53";
-import { createExportProcessor } from "./export-processor.js?v=53";
-import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=53";
-import { loadFilterLut } from "./lut-loader.js?v=53";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=53";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=54";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=54";
+import { createExportProcessor } from "./export-processor.js?v=54";
+import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=54";
+import { loadFilterLut } from "./lut-loader.js?v=54";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=54";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -96,7 +96,7 @@ function ensureExportProcessor() {
   if (exportProcessor) return exportProcessor;
   exportProcessor = createExportProcessor({
     createWorker: () => new Worker(
-      new URL("./export-worker.js?v=53", import.meta.url),
+      new URL("./export-worker.js?v=54", import.meta.url),
       { type: "module" },
     ),
     onWorkerCreated() {
@@ -196,11 +196,15 @@ function updateDiagnosticOverlay() {
     "Grain: " + edit.grain,
     "Light v2: " + (edit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (edit.color === 0 ? "off" : "active"),
-    "Grain engine: v4 correlated " + (edit.grain === 0 ? "(off)" : "(active)"),
+    "Grain engine: v5-band-limited " + (edit.grain === 0 ? "(off)" : "(active)"),
     "Reference grain scale: 960 px long edge",
-    "Correlation radius: " + grainParameters.correlationRadius.toFixed(2) + " ref px",
+    "Band-pass scales: σ " + grainParameters.bandPassSmallSigma.toFixed(2)
+      + " / " + grainParameters.bandPassBroadSigma.toFixed(2) + " ref px",
+    "RMS amplitude: " + grainParameters.rmsStops.toFixed(4) + " stops",
     "Roughness: " + grainParameters.roughness.toFixed(3),
     "Detail coupling: " + grainParameters.detailCoupling.toFixed(3),
+    "Reference LF energy ratio: "
+      + grainParameters.referenceLowFrequencyEnergyRatio.toFixed(4),
     "grainSeed: " + (photo ? photo.grainSeed : "—"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback ? ["GPU fallback: " + exportTiming.gpuFallback] : []),
@@ -898,7 +902,7 @@ window.addEventListener("beforeunload", () => {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     markStartup("window load");
-    navigator.serviceWorker.register("./sw.js?v=53", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=54", { scope: "./" }).catch(() => {});
     if (DEBUG_MODE) updateDiagnosticOverlay();
   });
 }

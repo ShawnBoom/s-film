@@ -805,11 +805,15 @@ export default function Home() {
     "Grain: " + currentEdit.grain,
     "Light v2: " + (currentEdit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (currentEdit.color === 0 ? "off" : "active"),
-    "Grain engine: v4 correlated " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
+    "Grain engine: v5-band-limited " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
     "Reference grain scale: 960 px long edge",
-    "Correlation radius: " + diagnosticGrain.correlationRadius.toFixed(2) + " ref px",
+    "Band-pass scales: σ " + diagnosticGrain.bandPassSmallSigma.toFixed(2)
+      + " / " + diagnosticGrain.bandPassBroadSigma.toFixed(2) + " ref px",
+    "RMS amplitude: " + diagnosticGrain.rmsStops.toFixed(4) + " stops",
     "Roughness: " + diagnosticGrain.roughness.toFixed(3),
     "Detail coupling: " + diagnosticGrain.detailCoupling.toFixed(3),
+    "Reference LF energy ratio: "
+      + diagnosticGrain.referenceLowFrequencyEnergyRatio.toFixed(4),
     "grainSeed: " + (currentPhoto ? currentPhoto.grainSeed : "—"),
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback

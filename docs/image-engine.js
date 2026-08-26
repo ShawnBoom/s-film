@@ -18,13 +18,6 @@ function linearToSrgb(value) {
     : 1.055 * channel ** (1 / 2.4) - 0.055;
 }
 
-function srgbToLinear(value) {
-  const channel = clamp01(value);
-  return channel <= 0.04045
-    ? channel / 12.92
-    : ((channel + 0.055) / 1.055) ** 2.4;
-}
-
 function lutIndex(size, r, g, b) {
   return ((b * size + g) * size + r) * 3;
 }
@@ -239,126 +232,224 @@ function applyColor(r, g, b, parameters) {
   return gamutMapOklab(L, a * factor, bValue * factor);
 }
 
-function grainCellState(x, y, seed) {
+const GRAIN_SMALL_WEIGHTS = Object.freeze([
+  0.00001453,
+  0.00539458,
+  0.18785872,
+  0.61346435,
+  0.18785872,
+  0.00539458,
+  0.00001453,
+]);
+
+const GRAIN_BROAD_WEIGHTS = Object.freeze([
+  0.02153191,
+  0.09452136,
+  0.22961404,
+  0.30866539,
+  0.22961404,
+  0.09452136,
+  0.02153191,
+]);
+
+const GRAIN_BAND_NORMALIZATION = 5.62214436;
+const GRAIN_FIELD_LIMIT = 3;
+
+function grainHashState(x, y, seed) {
   let state = (Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ seed) >>> 0;
   state = Math.imul(state ^ (state >>> 13), 1274126177) >>> 0;
   state = (state ^ (state >>> 16)) >>> 0;
   return state === 0 ? 0x6d2b79f5 : state;
 }
 
-function smoothstepRange(low, high, value) {
-  const normalized = clamp01((value - low) / (high - low));
-  return normalized * normalized * (3 - 2 * normalized);
+function grainHashValue(x, y, seed) {
+  return grainHashState(x, y, seed) / 4294967295 * 2 - 1;
+}
+
+function grainReferenceSize(width, height) {
+  const scale = Math.min(1, 960 / Math.max(1, width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
 }
 
 export function getGrainParameters(grain, width, height) {
   const amount = Math.max(0, Math.min(1, grain / 100));
+  const referenceSize = grainReferenceSize(width, height);
   if (amount === 0) {
     return {
       active: false,
-      engine: "v4-correlated",
+      engine: "v5-band-limited",
       amount: 0,
       referenceLongEdge: 960,
       coordinateScale: 0,
-      primaryScale: 3.6,
-      correlationRadius: 0,
-      variance: 0,
+      referenceWidth: referenceSize.width,
+      referenceHeight: referenceSize.height,
+      bandPassSmallSigma: 0.65,
+      bandPassBroadSigma: 1.3,
+      rmsStops: 0,
       roughness: 0,
       detailCoupling: 0,
-      acutanceRecovery: 0,
+      referenceLowFrequencyEnergyRatio: 0.0002,
     };
   }
 
   return {
     active: true,
-    engine: "v4-correlated",
+    engine: "v5-band-limited",
     amount,
     referenceLongEdge: 960,
-    coordinateScale: 960 / Math.max(1, width, height),
-    primaryScale: 3.6,
-    correlationRadius: 3.6,
-    variance: 0.12 * amount ** 0.82,
-    roughness: 0.1 + 0.45 * amount ** 0.9,
-    detailCoupling: 0.09 * amount ** 1.35,
-    acutanceRecovery: 0.007 * amount ** 1.5,
+    coordinateScale: Math.min(1, 960 / Math.max(1, width, height)),
+    referenceWidth: referenceSize.width,
+    referenceHeight: referenceSize.height,
+    bandPassSmallSigma: 0.65,
+    bandPassBroadSigma: 1.3,
+    rmsStops: 0.085 * amount ** 0.9,
+    roughness: 0.25 * amount ** 0.8,
+    detailCoupling: 0.035 * amount ** 1.5,
+    referenceLowFrequencyEnergyRatio: 0.0002,
   };
 }
 
-function grainLatticeValue(x, y, seed) {
-  return grainCellState(x, y, seed) / 4294967295 * 2 - 1;
+export function createBandLimitedGrainField(width, height, seed = 1) {
+  const { width: referenceWidth, height: referenceHeight } = grainReferenceSize(width, height);
+  const length = referenceWidth * referenceHeight;
+  const noise = new Float32Array(length);
+  const smallHorizontal = new Float32Array(length);
+  const broadHorizontal = new Float32Array(length);
+  const field = new Float32Array(length);
+
+  for (let y = 0; y < referenceHeight; y += 1) {
+    for (let x = 0; x < referenceWidth; x += 1) {
+      noise[y * referenceWidth + x] = grainHashValue(x, y, seed);
+    }
+  }
+
+  for (let y = 0; y < referenceHeight; y += 1) {
+    const row = y * referenceWidth;
+    for (let x = 0; x < referenceWidth; x += 1) {
+      let small = 0;
+      let broad = 0;
+      for (let tap = -3; tap <= 3; tap += 1) {
+        const sampleX = Math.max(0, Math.min(referenceWidth - 1, x + tap));
+        const sample = noise[row + sampleX];
+        small += sample * GRAIN_SMALL_WEIGHTS[tap + 3];
+        broad += sample * GRAIN_BROAD_WEIGHTS[tap + 3];
+      }
+      smallHorizontal[row + x] = small;
+      broadHorizontal[row + x] = broad;
+    }
+  }
+
+  for (let y = 0; y < referenceHeight; y += 1) {
+    for (let x = 0; x < referenceWidth; x += 1) {
+      let small = 0;
+      let broad = 0;
+      for (let tap = -3; tap <= 3; tap += 1) {
+        const sampleY = Math.max(0, Math.min(referenceHeight - 1, y + tap));
+        const index = sampleY * referenceWidth + x;
+        small += smallHorizontal[index] * GRAIN_SMALL_WEIGHTS[tap + 3];
+        broad += broadHorizontal[index] * GRAIN_BROAD_WEIGHTS[tap + 3];
+      }
+      field[y * referenceWidth + x] = Math.max(
+        -GRAIN_FIELD_LIMIT,
+        Math.min(GRAIN_FIELD_LIMIT, (small - broad) * GRAIN_BAND_NORMALIZATION),
+      );
+    }
+  }
+
+  return { width: referenceWidth, height: referenceHeight, data: field };
 }
 
-function sampleCorrelatedExcitation(x, y, scale, seed) {
-  const scaledX = x / scale;
-  const scaledY = y / scale;
-  const originX = Math.floor(scaledX);
-  const originY = Math.floor(scaledY);
-  const blendX = smoothstepRange(0, 1, scaledX - originX);
-  const blendY = smoothstepRange(0, 1, scaledY - originY);
-  const top = grainLatticeValue(originX, originY, seed)
-    + (grainLatticeValue(originX + 1, originY, seed)
-      - grainLatticeValue(originX, originY, seed)) * blendX;
-  const bottom = grainLatticeValue(originX, originY + 1, seed)
-    + (grainLatticeValue(originX + 1, originY + 1, seed)
-      - grainLatticeValue(originX, originY + 1, seed)) * blendX;
-  return top + (bottom - top) * blendY;
+export function shapeBandLimitedGrain(value, roughness) {
+  const heavyTail = value + roughness * 0.06 * (value ** 3 - 3 * value);
+  const normalization = 1.0865 + 0.0608 * roughness;
+  return 2.8 * Math.tanh(heavyTail / 2.8) * normalization;
 }
 
-function sampleCorrelatedGrainField(x, y, parameters, seed) {
-  const pointX = (x + 0.5) * parameters.coordinateScale;
-  const pointY = (y + 0.5) * parameters.coordinateScale;
-  const first = sampleCorrelatedExcitation(pointX, pointY, parameters.primaryScale, seed);
-  const rotatedX = 0.70710678 * (pointX - pointY) + 19.37;
-  const rotatedY = 0.70710678 * (pointX + pointY) - 7.91;
-  const second = sampleCorrelatedExcitation(
-    rotatedX,
-    rotatedY,
-    parameters.primaryScale,
-    seed ^ 0x9e3779b9,
-  );
-  const mixed = 0.78 * first + 0.52 * second;
-  const localRoughness = 1 + parameters.roughness * 0.65 * Math.abs(first - second);
-  return Math.max(-1.8, Math.min(1.8, mixed * localRoughness));
+function sampleBandLimitedGrain(field, x, y, outputWidth, outputHeight) {
+  const fieldX = (x + 0.5) * field.width / outputWidth - 0.5;
+  const fieldY = (y + 0.5) * field.height / outputHeight - 0.5;
+  const x0 = Math.max(0, Math.min(field.width - 1, Math.floor(fieldX)));
+  const y0 = Math.max(0, Math.min(field.height - 1, Math.floor(fieldY)));
+  const x1 = Math.min(field.width - 1, x0 + 1);
+  const y1 = Math.min(field.height - 1, y0 + 1);
+  const mixX = clamp01(fieldX - x0);
+  const mixY = clamp01(fieldY - y0);
+  const top = field.data[y0 * field.width + x0]
+    + (field.data[y0 * field.width + x1] - field.data[y0 * field.width + x0]) * mixX;
+  const bottom = field.data[y1 * field.width + x0]
+    + (field.data[y1 * field.width + x1] - field.data[y1 * field.width + x0]) * mixX;
+  return top + (bottom - top) * mixY;
 }
 
-function sourceLuminanceAt(source, x, y) {
-  const sampleX = Math.max(0, Math.min(source.width - 1, x));
-  const sampleY = Math.max(0, Math.min(source.height - 1, y));
-  const offset = (sampleY * source.width + sampleX) * 4;
-  return (
-    source.data[offset] * 0.2126
-    + source.data[offset + 1] * 0.7152
-    + source.data[offset + 2] * 0.0722
-  ) / 255;
+function fillProcessedLuminanceRow(pixels, width, height, y, target) {
+  const sampleY = Math.max(0, Math.min(height - 1, y));
+  for (let x = 0; x < width; x += 1) {
+    const offset = (sampleY * width + x) * 4;
+    target[x] = (
+      SRGB_TO_LINEAR[pixels[offset]] * 0.2126
+      + SRGB_TO_LINEAR[pixels[offset + 1]] * 0.7152
+      + SRGB_TO_LINEAR[pixels[offset + 2]] * 0.0722
+    );
+  }
 }
 
-function sourceMicroDetail(source, x, y) {
-  const center = sourceLuminanceAt(source, x, y);
-  const neighbors = (
-    sourceLuminanceAt(source, x - 1, y)
-    + sourceLuminanceAt(source, x + 1, y)
-    + sourceLuminanceAt(source, x, y - 1)
-    + sourceLuminanceAt(source, x, y + 1)
-  ) * 0.25;
-  return center - neighbors;
-}
+function applyBandLimitedGrain(output, width, height, parameters, seed) {
+  const field = createBandLimitedGrainField(width, height, seed);
+  let previous = new Float32Array(width);
+  let current = new Float32Array(width);
+  let next = new Float32Array(width);
+  fillProcessedLuminanceRow(output, width, height, 0, previous);
+  fillProcessedLuminanceRow(output, width, height, 0, current);
+  fillProcessedLuminanceRow(output, width, height, 1, next);
 
-function sampleGrain(r, g, b, x, y, microDetail, parameters, seed) {
-  const texture = sampleCorrelatedGrainField(x, y, parameters, seed);
-  const luminance = clamp01(r * 0.2126 + g * 0.7152 + b * 0.0722);
-  const exposureResponse = Math.sqrt(0.58 + 0.42 * clamp01(4 * luminance * (1 - luminance)));
-  const perceptualLuminance = linearToSrgb(luminance);
-  const absoluteDetail = Math.abs(microDetail);
-  const integrationWeight = 1 - smoothstepRange(0.035, 0.18, absoluteDetail);
-  const edgeWeight = smoothstepRange(0.05, 0.18, absoluteDetail)
-    * (1 - smoothstepRange(0.3, 0.55, absoluteDetail));
-  const targetLuminance = clamp01(
-    perceptualLuminance
-      + texture * parameters.variance * exposureResponse
-      - microDetail * parameters.detailCoupling * integrationWeight
-      + microDetail * parameters.acutanceRecovery * edgeWeight,
-  );
-  return srgbToLinear(targetLuminance) - luminance;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      const r = SRGB_TO_LINEAR[output[offset]];
+      const g = SRGB_TO_LINEAR[output[offset + 1]];
+      const b = SRGB_TO_LINEAR[output[offset + 2]];
+      const luminance = current[x];
+      if (luminance <= 1e-7) continue;
+
+      const left = current[Math.max(0, x - 1)];
+      const right = current[Math.min(width - 1, x + 1)];
+      const microscopicBlur = luminance * 0.5
+        + (left + right + previous[x] + next[x]) * 0.125;
+      const fineDetail = luminance - microscopicBlur;
+      const integratedLuminance = Math.max(
+        0,
+        luminance - fineDetail * parameters.detailCoupling,
+      );
+      const fieldValue = shapeBandLimitedGrain(
+        sampleBandLimitedGrain(field, x, y, width, height),
+        parameters.roughness,
+      );
+      const signalResponse = 0.9
+        + 0.1 * Math.sqrt(clamp01(4 * luminance * (1 - luminance)));
+      const exposureStops = fieldValue * parameters.rmsStops * signalResponse;
+      const targetLuminance = Math.max(
+        0,
+        (integratedLuminance + 0.0015) * 2 ** exposureStops - 0.0015,
+      );
+      const maximum = Math.max(r, g, b);
+      const requestedScale = targetLuminance / luminance;
+      const gamutScale = maximum > 1e-7 ? 1 / maximum : 1;
+      const scale = Math.max(0, Math.min(requestedScale, gamutScale));
+
+      output[offset] = Math.round(linearToSrgb(r * scale) * 255);
+      output[offset + 1] = Math.round(linearToSrgb(g * scale) * 255);
+      output[offset + 2] = Math.round(linearToSrgb(b * scale) * 255);
+    }
+
+    const reusable = previous;
+    previous = current;
+    current = next;
+    next = reusable;
+    fillProcessedLuminanceRow(output, width, height, y + 2, next);
+  }
 }
 
 export function hashSeed(value) {
@@ -413,19 +504,15 @@ export function processPixels(source, edit, seed = 1) {
 
       if (lightParameters.active) [r, g, b] = applyExposure(r, g, b, lightParameters);
       if (colorParameters.active) [r, g, b] = applyColor(r, g, b, colorParameters);
-      if (grainParameters.active) {
-        const microDetail = sourceMicroDetail(source, x, y);
-        const grainValue = sampleGrain(r, g, b, x, y, microDetail, grainParameters, seed);
-        r += grainValue;
-        g += grainValue;
-        b += grainValue;
-      }
-
       output[offset] = Math.round(linearToSrgb(r) * 255);
       output[offset + 1] = Math.round(linearToSrgb(g) * 255);
       output[offset + 2] = Math.round(linearToSrgb(b) * 255);
       output[offset + 3] = source.data[offset + 3];
     }
+  }
+
+  if (grainParameters.active) {
+    applyBandLimitedGrain(output, width, height, grainParameters, seed);
   }
 
   return output;

@@ -1,5 +1,5 @@
-const CORE_CACHE = "see-core-v53";
-const RUNTIME_CACHE = "see-runtime-v53";
+const CORE_CACHE = "see-core-v54";
+const RUNTIME_CACHE = "see-runtime-v54";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
