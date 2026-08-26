@@ -1,0 +1,218 @@
+{
+  "packVersion": "1",
+  "format": "float32-le-rgb",
+  "lutCount": 14,
+  "totalBytes": 22080576,
+  "luts": [
+    {
+      "id": "classic",
+      "displayName": "Nostalgic Neg",
+      "dimension": 33,
+      "url": "./luts-bin/v1/nostalgic-neg.551d095a11ac.bin",
+      "byteLength": 431244,
+      "floatCount": 107811,
+      "sha256": "551d095a11accd780a91b1616946b1d63a241a4bb7ad0efdcff1abe087983a37",
+      "version": "1",
+      "legacy": {
+        "url": "./s01-classic-neg-lut.js",
+        "dataExport": "S01_LUT",
+        "sizeExport": "S01_LUT_SIZE"
+      }
+    },
+    {
+      "id": "gold",
+      "displayName": "Classic Neg",
+      "dimension": 33,
+      "url": "./luts-bin/v1/classic-neg.55eb6aeaa656.bin",
+      "byteLength": 431244,
+      "floatCount": 107811,
+      "sha256": "55eb6aeaa656b63dfdee4133d3f70c4804723fbc084ca77ee596d39d8a3999c2",
+      "version": "1",
+      "legacy": {
+        "url": "./s02-classic-chrome-lut.js",
+        "dataExport": "S02_LUT",
+        "sizeExport": "S02_LUT_SIZE"
+      }
+    },
+    {
+      "id": "youth",
+      "displayName": "Classic Chrome",
+      "dimension": 33,
+      "url": "./luts-bin/v1/classic-chrome.2199717ce62c.bin",
+      "byteLength": 431244,
+      "floatCount": 107811,
+      "sha256": "2199717ce62c9267f129e0739169161b4c7d3a2ec7d04d5ec419683fa407190b",
+      "version": "1",
+      "legacy": {
+        "url": "./s03-classic-chrome-lut.js",
+        "dataExport": "S03_LUT",
+        "sizeExport": "S03_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot07",
+      "displayName": "Color 800Z",
+      "dimension": 33,
+      "url": "./luts-bin/v1/color-800z.018038948fe0.bin",
+      "byteLength": 431244,
+      "floatCount": 107811,
+      "sha256": "018038948fe05ace29bd1125595f2b4ef486e30bdc73fe515efa8a473706abaa",
+      "version": "1",
+      "legacy": {
+        "url": "./s07-color800z-lut.js",
+        "dataExport": "S07_LUT",
+        "sizeExport": "S07_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot06",
+      "displayName": "Color 100",
+      "dimension": 33,
+      "url": "./luts-bin/v1/color-100.3e7cf1e63f3a.bin",
+      "byteLength": 431244,
+      "floatCount": 107811,
+      "sha256": "3e7cf1e63f3ad4bb32fe8bbee274c664f7cd7c9b442c044f743fad9793e703d6",
+      "version": "1",
+      "legacy": {
+        "url": "./s06-color100-lut.js",
+        "dataExport": "S06_LUT",
+        "sizeExport": "S06_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot04",
+      "displayName": "Provia 400H",
+      "dimension": 33,
+      "url": "./luts-bin/v1/provia-400h.584290a419dc.bin",
+      "byteLength": 431244,
+      "floatCount": 107811,
+      "sha256": "584290a419dc9a6ab6b2959af96ab8cea920684561a837e9287a3a77e5386651",
+      "version": "1",
+      "legacy": {
+        "url": "./s04-pro400h-lut.js",
+        "dataExport": "S04_LUT",
+        "sizeExport": "S04_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot05",
+      "displayName": "Superia 400",
+      "dimension": 33,
+      "url": "./luts-bin/v1/superia-400.0b11651575f8.bin",
+      "byteLength": 431244,
+      "floatCount": 107811,
+      "sha256": "0b11651575f86f6981022e6d6b049e78d8340bcbace2a35f3c59cc9cba3d57c4",
+      "version": "1",
+      "legacy": {
+        "url": "./s05-superia400-lut.js",
+        "dataExport": "S05_LUT",
+        "sizeExport": "S05_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot12",
+      "displayName": "Portra 400",
+      "dimension": 64,
+      "url": "./luts-bin/v1/portra-400.7804d2a82303.bin",
+      "byteLength": 3145728,
+      "floatCount": 786432,
+      "sha256": "7804d2a8230337aef7828102f1908b32228c873dec16d329fe69b6b02e7da0b8",
+      "version": "1",
+      "legacy": {
+        "url": "./s12-portra400-lut.js",
+        "dataExport": "S12_LUT",
+        "sizeExport": "S12_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot09",
+      "displayName": "Portra Cool",
+      "dimension": 64,
+      "url": "./luts-bin/v1/portra-cool.20a35fd75dd2.bin",
+      "byteLength": 3145728,
+      "floatCount": 786432,
+      "sha256": "20a35fd75dd22dcc3f4f8a6aed4c167a57b751cb1a8eb88c95f2fd45311d0df7",
+      "version": "1",
+      "legacy": {
+        "url": "./s09-portra-cool-lut.js",
+        "dataExport": "S09_LUT",
+        "sizeExport": "S09_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot13",
+      "displayName": "Gold 200",
+      "dimension": 64,
+      "url": "./luts-bin/v1/gold-200.d7a460328c83.bin",
+      "byteLength": 3145728,
+      "floatCount": 786432,
+      "sha256": "d7a460328c834096f188bce0bd5ab8fdc9c34985dac364dd43bf88eee2052a63",
+      "version": "1",
+      "legacy": {
+        "url": "./s13-gold200-lut.js",
+        "dataExport": "S13_LUT",
+        "sizeExport": "S13_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot08",
+      "displayName": "Gold Blue",
+      "dimension": 64,
+      "url": "./luts-bin/v1/gold-blue.a5eedf9fbdc3.bin",
+      "byteLength": 3145728,
+      "floatCount": 786432,
+      "sha256": "a5eedf9fbdc3642fca7c3ec97e965ccb498bdc5bcc3f7eaaf8ecf57994a6a6aa",
+      "version": "1",
+      "legacy": {
+        "url": "./s08-gold-blue-lut.js",
+        "dataExport": "S08_LUT",
+        "sizeExport": "S08_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot10",
+      "displayName": "Proimage 100",
+      "dimension": 25,
+      "url": "./luts-bin/v1/proimage-100.4d8b00bc1fa4.bin",
+      "byteLength": 187500,
+      "floatCount": 46875,
+      "sha256": "4d8b00bc1fa4285e4555a8aaef197e3c469423b4322f62d1266fbd8da8389b9d",
+      "version": "1",
+      "legacy": {
+        "url": "./s10-proimage-original-lut.js",
+        "dataExport": "S10_LUT",
+        "sizeExport": "S10_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot11",
+      "displayName": "Ektar 100",
+      "dimension": 64,
+      "url": "./luts-bin/v1/ektar-100.d5d843c7a51c.bin",
+      "byteLength": 3145728,
+      "floatCount": 786432,
+      "sha256": "d5d843c7a51c8f08848daf0370068f1d8c0278168678b14da273802b2e2982e4",
+      "version": "1",
+      "legacy": {
+        "url": "./s11-ektar100-lut.js",
+        "dataExport": "S11_LUT",
+        "sizeExport": "S11_LUT_SIZE"
+      }
+    },
+    {
+      "id": "slot14",
+      "displayName": "Chrome 64",
+      "dimension": 64,
+      "url": "./luts-bin/v1/chrome-64.adc61767fabb.bin",
+      "byteLength": 3145728,
+      "floatCount": 786432,
+      "sha256": "adc61767fabbc120a7c4c51a54be1dbac607d993977241d6f3dcdd933ea5e682",
+      "version": "1",
+      "legacy": {
+        "url": "./s14-chrome64-lut.js",
+        "dataExport": "S14_LUT",
+        "sizeExport": "S14_LUT_SIZE"
+      }
+    }
+  ]
+}

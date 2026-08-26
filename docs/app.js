@@ -1,9 +1,14 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=54";
-import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=54";
-import { createExportProcessor } from "./export-processor.js?v=54";
-import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=54";
-import { loadFilterLut } from "./lut-loader.js?v=54";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=54";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=55";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=55";
+import { createExportProcessor } from "./export-processor.js?v=55";
+import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=55";
+import {
+  getLutPackStatus,
+  loadFilterLut,
+  prepareOfflineLutPack,
+  subscribeLutPackStatus,
+} from "./lut-loader.js?v=55";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=55";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -74,6 +79,13 @@ let gpuPreview = null;
 let gpuPreviewAttempted = false;
 let exportProcessor = null;
 const diagnosticOverlay = DEBUG_MODE ? createDiagnosticOverlay() : null;
+let lutPackStatus = getLutPackStatus();
+if (DEBUG_MODE) {
+  subscribeLutPackStatus((status) => {
+    lutPackStatus = status;
+    updateDiagnosticOverlay();
+  });
+}
 
 function ensureGpuPreview() {
   if (gpuPreviewAttempted) return gpuPreview;
@@ -96,7 +108,7 @@ function ensureExportProcessor() {
   if (exportProcessor) return exportProcessor;
   exportProcessor = createExportProcessor({
     createWorker: () => new Worker(
-      new URL("./export-worker.js?v=54", import.meta.url),
+      new URL("./export-worker.js?v=55", import.meta.url),
       { type: "module" },
     ),
     onWorkerCreated() {
@@ -206,6 +218,18 @@ function updateDiagnosticOverlay() {
     "Reference LF energy ratio: "
       + grainParameters.referenceLowFrequencyEnergyRatio.toFixed(4),
     "grainSeed: " + (photo ? photo.grainSeed : "—"),
+    "",
+    "LUT architecture: " + lutPackStatus.architecture,
+    "LUT pack version: " + lutPackStatus.packVersion,
+    "Offline LUTs: " + lutPackStatus.cachedCount + " / " + lutPackStatus.totalCount,
+    "Offline ready: " + (lutPackStatus.ready ? "YES" : "NO"),
+    "Pack bytes: " + lutPackStatus.cachedBytes + " / " + lutPackStatus.totalBytes,
+    "Current LUT: " + lutPackStatus.currentLut,
+    "Current LUT dimension: " + lutPackStatus.currentDimension,
+    "Current LUT source: " + lutPackStatus.currentSource,
+    "Background preparation: " + lutPackStatus.preparation,
+    ...(lutPackStatus.error ? ["LUT pack error: " + lutPackStatus.error] : []),
+    "",
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback ? ["GPU fallback: " + exportTiming.gpuFallback] : []),
     ...(diagnostics.lutError ? ["LUT load failed: " + diagnostics.lutError] : []),
@@ -806,6 +830,7 @@ async function exportPhotos() {
       setStatus("照片包已保存");
     }
   } catch (error) {
+    if (DEBUG_MODE) diagnostics.exportError = `Save: ${error instanceof Error ? error.message : String(error)}`;
     if (error?.name === "AbortError") setStatus("已取消分享");
     else setStatus("保存失败，请减少照片数量后重试");
   } finally {
@@ -902,7 +927,16 @@ window.addEventListener("beforeunload", () => {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     markStartup("window load");
-    navigator.serviceWorker.register("./sw.js?v=54", { scope: "./" }).catch(() => {});
+    window.requestAnimationFrame(() => window.setTimeout(async () => {
+      try {
+        const registration = await navigator.serviceWorker.register("./sw.js?v=55", { scope: "./" });
+        markStartup("LUT preparation start");
+        await prepareOfflineLutPack(registration);
+      } catch (error) {
+        if (DEBUG_MODE) diagnostics.lutError = `offline pack: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      if (DEBUG_MODE) updateDiagnosticOverlay();
+    }, 0));
     if (DEBUG_MODE) updateDiagnosticOverlay();
   });
 }

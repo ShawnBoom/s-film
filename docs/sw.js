@@ -1,23 +1,26 @@
 "use strict";
 
-const CORE_CACHE = "see-core-v54";
-const LUT_CACHE = "see-luts-v52";
-const LEGACY_LUT_CACHE = "see-static-v48";
+importScripts("./lut-pack-sw.js?v=1");
+
+const CORE_CACHE = "see-core-v55";
 const ROOT = new URL("./", self.registration.scope).href;
+const LUT_MANIFEST_URL = new URL("./lut-pack-v1.json", ROOT).href;
 const CORE_APP_SHELL = [
   ROOT,
   new URL("./index.html", ROOT).href,
-  new URL("./styles.css?v=54", ROOT).href,
-  new URL("./app.js?v=54", ROOT).href,
-  new URL("./gpu-preview.js?v=54", ROOT).href,
-  new URL("./gpu-export.js?v=54", ROOT).href,
-  new URL("./export-processor.js?v=54", ROOT).href,
-  new URL("./export-worker.js?v=54", ROOT).href,
-  new URL("./edit-state.js?v=54", ROOT).href,
-  new URL("./image-engine.js?v=54", ROOT).href,
-  new URL("./lut-loader.js?v=54", ROOT).href,
-  new URL("./manifest.webmanifest?v=54", ROOT).href,
-  new URL("./apple-touch-icon.png?v=54", ROOT).href,
+  new URL("./styles.css?v=55", ROOT).href,
+  new URL("./app.js?v=55", ROOT).href,
+  new URL("./gpu-preview.js?v=55", ROOT).href,
+  new URL("./gpu-export.js?v=55", ROOT).href,
+  new URL("./export-processor.js?v=55", ROOT).href,
+  new URL("./export-worker.js?v=55", ROOT).href,
+  new URL("./edit-state.js?v=55", ROOT).href,
+  new URL("./image-engine.js?v=55", ROOT).href,
+  new URL("./lut-loader.js?v=55", ROOT).href,
+  new URL("./lut-pack-sw.js?v=1", ROOT).href,
+  LUT_MANIFEST_URL,
+  new URL("./manifest.webmanifest?v=55", ROOT).href,
+  new URL("./apple-touch-icon.png?v=55", ROOT).href,
   new URL("./icons/see-apple-touch-icon-120.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-152.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-167.png", ROOT).href,
@@ -30,16 +33,6 @@ const CORE_APP_SHELL = [
   new URL("./s-film-social.png", ROOT).href,
   new URL("./og.png", ROOT).href,
 ];
-
-function isLutRequest(url) {
-  return /\/s(?:0[1-9]|1[0-4])-[^/]+-lut\.js$/.test(url.pathname);
-}
-
-function canonicalLutRequest(request) {
-  const url = new URL(request.url);
-  url.searchParams.delete("retry");
-  return new Request(url.href, request);
-}
 
 async function fetchAndCache(request, cacheName, cacheKey = request) {
   const response = await fetch(request);
@@ -61,14 +54,20 @@ self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys
-      .filter((key) => (
-        key !== CORE_CACHE
-        && key !== LUT_CACHE
-        && key !== LEGACY_LUT_CACHE
-      ))
+      .filter((key) => key !== CORE_CACHE && !self.SeeLutPackSW.protectedCacheNames.has(key))
       .map((key) => caches.delete(key)));
     await self.clients.claim();
   })());
+});
+
+self.addEventListener("message", (event) => {
+  const message = event.data;
+  if (!message) return;
+  if (message.type === "SEE_PREPARE_LUT_PACK") {
+    event.waitUntil(self.SeeLutPackSW.preparePack(message.manifestUrl || LUT_MANIFEST_URL, ROOT).catch(() => {}));
+  } else if (message.type === "SEE_GET_LUT_PACK_STATUS") {
+    event.waitUntil(self.SeeLutPackSW.postStoredStatus(ROOT, event.source));
+  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -90,27 +89,20 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isLutRequest(url)) {
-    event.respondWith((async () => {
-      const lutCache = await caches.open(LUT_CACHE);
-      const cacheKey = canonicalLutRequest(request);
-      const cached = await lutCache.match(cacheKey);
-      if (cached) return cached;
-      try {
-        return await fetchAndCache(request, LUT_CACHE, cacheKey);
-      } catch (error) {
-        const legacyCache = await caches.open(LEGACY_LUT_CACHE);
-        const legacy = await legacyCache.match(cacheKey, { ignoreSearch: true });
-        if (legacy) return legacy;
-        throw error;
-      }
-    })());
+  if (self.SeeLutPackSW.isBinaryLutRequest(url)) {
+    event.respondWith(self.SeeLutPackSW.handleBinaryRequest(request, LUT_MANIFEST_URL, ROOT));
     return;
   }
 
-  if (["script", "style", "image", "font", "manifest"].includes(request.destination)) {
+  if (self.SeeLutPackSW.isLegacyLutRequest(url)) {
+    event.respondWith(self.SeeLutPackSW.handleLegacyRequest(request));
+    return;
+  }
+
+  if (["script", "style", "image", "font", "manifest"].includes(request.destination)
+      || url.href === LUT_MANIFEST_URL) {
     event.respondWith(caches.open(CORE_CACHE).then(async (cache) => (
-      await cache.match(request)
+      await cache.match(request, { ignoreSearch: false })
       || fetchAndCache(request, CORE_CACHE)
     )));
   }

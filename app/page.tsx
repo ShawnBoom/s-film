@@ -9,7 +9,7 @@ import { createExportProcessor } from "../lib/export-processor.js";
 import { attemptGpuFullResolutionExport } from "../lib/gpu-export.js";
 import { createGpuPreviewRenderer } from "../lib/gpu-preview.js";
 import { getGrainParameters, hashSeed, processPixels } from "../lib/image-engine.js";
-import { loadFilterLut } from "../lib/lut-loader.js";
+import { getLutPackStatus, loadFilterLut, subscribeLutPackStatus } from "../lib/lut-loader.js";
 import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
 
 const FILTERS = [
@@ -205,6 +205,7 @@ export default function Home() {
     && new URLSearchParams(window.location.search).get("debug") === "1"
   ));
   const [debugVersion, setDebugVersion] = useState(0);
+  const [lutPackStatus, setLutPackStatus] = useState(() => getLutPackStatus());
   const [loadingFilters, setLoadingFilters] = useState<Set<FilterId>>(() => new Set());
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -252,6 +253,11 @@ export default function Home() {
     markStartup("+ functional");
     markStartup("app ready");
   }, []);
+
+  useEffect(() => {
+    if (!debugMode) return undefined;
+    return subscribeLutPackStatus(setLutPackStatus);
+  }, [debugMode]);
 
   useEffect(() => {
     const handlePageHide = (event: PageTransitionEvent) => {
@@ -728,6 +734,10 @@ export default function Home() {
         setStatus("照片包已保存");
       }
     } catch (error) {
+      if (debugMode) {
+        diagnosticsRef.current.exportError = `Save: ${error instanceof Error ? error.message : String(error)}`;
+        setDebugVersion((version) => version + 1);
+      }
       if ((error as DOMException)?.name === "AbortError") {
         setStatus("已取消分享");
       } else {
@@ -815,6 +825,18 @@ export default function Home() {
     "Reference LF energy ratio: "
       + diagnosticGrain.referenceLowFrequencyEnergyRatio.toFixed(4),
     "grainSeed: " + (currentPhoto ? currentPhoto.grainSeed : "—"),
+    "",
+    "LUT architecture: " + lutPackStatus.architecture,
+    "LUT pack version: " + lutPackStatus.packVersion,
+    "Offline LUTs: " + lutPackStatus.cachedCount + " / " + lutPackStatus.totalCount,
+    "Offline ready: " + (lutPackStatus.ready ? "YES" : "NO"),
+    "Pack bytes: " + lutPackStatus.cachedBytes + " / " + lutPackStatus.totalBytes,
+    "Current LUT: " + lutPackStatus.currentLut,
+    "Current LUT dimension: " + lutPackStatus.currentDimension,
+    "Current LUT source: " + lutPackStatus.currentSource,
+    "Background preparation: " + lutPackStatus.preparation,
+    ...(lutPackStatus.error ? ["LUT pack error: " + lutPackStatus.error] : []),
+    "",
     "Export processor: " + exportProcessorLabel,
     ...(exportTiming.gpuFallback
       ? ["GPU fallback: " + exportTiming.gpuFallback]

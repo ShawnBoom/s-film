@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import "./install-file-fetch.mjs";
 import { hasEdits, visibleEditLabel } from "../lib/edit-state.js";
 import {
   createNeutralEdit,

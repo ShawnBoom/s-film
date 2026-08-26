@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import "./install-file-fetch.mjs";
 
 import { createExportProcessor } from "../lib/export-processor.js";
 import { processPixels } from "../lib/image-engine.js";
