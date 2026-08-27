@@ -849,7 +849,7 @@ export default function Home() {
     "Grain: " + currentEdit.grain,
     "Light v2: " + (currentEdit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (currentEdit.color === 0 ? "off" : "active"),
-    "Grain engine: v6.2 morphology " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
+    "Grain engine: v6.3 fine " + (currentEdit.grain === 0 ? "(off)" : "(active)"),
     "Reference grain scale: 960 px long edge",
     "Profile A: " + diagnosticGrain.profileA,
     "Profile B: " + diagnosticGrain.profileB,

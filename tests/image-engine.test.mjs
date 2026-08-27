@@ -189,13 +189,13 @@ test("Color v2.1 reaches perceptual grayscale at -100", () => {
   }
 });
 
-test("Grain v6.2 keeps the accepted v6.1 endpoints and slider response", () => {
+test("Grain v6.3 keeps the accepted v6.1 endpoints and slider response", () => {
   const values = [15, 25, 49, 50, 51, 75, 100].map((grain) =>
     getGrainParameters(grain, 4032, 3024));
   for (let index = 1; index < values.length; index += 1) {
     assert.ok(values[index].rmsStops > values[index - 1].rmsStops);
     assert.equal(values[index].referenceLongEdge, 960);
-    assert.equal(values[index].engine, "v6.2-morphology");
+    assert.equal(values[index].engine, "v6.3-fine");
   }
   const profileA = values[3];
   const profileB = values[6];
@@ -218,7 +218,7 @@ test("Grain v6.2 keeps the accepted v6.1 endpoints and slider response", () => {
   assert.equal(disabled.detailCoupling, 0);
 });
 
-test("Grain v6.2 strength remains monotonic and perceptually distributed", () => {
+test("Grain v6.3 strength remains monotonic and perceptually distributed", () => {
   const anchors = [0, 10, 25, 50, 75, 100].map((grain) =>
     getGrainParameters(grain, 4032, 3024).rmsStops);
   assert.deepEqual(anchors, [0, 0.05, 0.11, 0.2, 0.29, 0.34]);
@@ -271,7 +271,7 @@ test("Grain v6 keeps its 960px reference coordinate system resolution-independen
   assert.equal(landscape.referenceHeight, 540);
 });
 
-test("Grain v6.2 Profile A stays fine-grained without becoming pixel noise", () => {
+test("Grain v6.3 stays in the finest stable reference band", () => {
   const width = 960;
   const height = 192;
   const gray = new Uint8ClampedArray(width * height * 4);
@@ -310,8 +310,8 @@ test("Grain v6.2 Profile A stays fine-grained without becoming pixel noise", () 
   variance /= neighborCount;
   const horizontalCorrelation = horizontal / neighborCount / variance;
   const verticalCorrelation = vertical / neighborCount / variance;
-  assert.ok(horizontalCorrelation > 0.02 && horizontalCorrelation < 0.08);
-  assert.ok(verticalCorrelation > 0.02 && verticalCorrelation < 0.08);
+  assert.ok(horizontalCorrelation > -0.05 && horizontalCorrelation < 0.02);
+  assert.ok(verticalCorrelation > -0.05 && verticalCorrelation < 0.02);
   assert.ok(Math.abs(horizontalCorrelation - verticalCorrelation) < 0.08);
 });
 

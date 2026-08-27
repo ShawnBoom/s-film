@@ -2,25 +2,25 @@
 
 importScripts("./lut-pack-sw.js?v=1");
 
-const CORE_CACHE = "see-core-v58";
+const CORE_CACHE = "see-core-v59";
 const ROOT = new URL("./", self.registration.scope).href;
 const LUT_MANIFEST_URL = new URL("./lut-pack-v1.json", ROOT).href;
 const CORE_APP_SHELL = [
   ROOT,
   new URL("./index.html", ROOT).href,
-  new URL("./styles.css?v=58", ROOT).href,
-  new URL("./app.js?v=58", ROOT).href,
-  new URL("./gpu-preview.js?v=58", ROOT).href,
-  new URL("./gpu-export.js?v=58", ROOT).href,
-  new URL("./export-processor.js?v=58", ROOT).href,
-  new URL("./export-worker.js?v=58", ROOT).href,
-  new URL("./edit-state.js?v=58", ROOT).href,
-  new URL("./image-engine.js?v=58", ROOT).href,
-  new URL("./lut-loader.js?v=58", ROOT).href,
+  new URL("./styles.css?v=59", ROOT).href,
+  new URL("./app.js?v=59", ROOT).href,
+  new URL("./gpu-preview.js?v=59", ROOT).href,
+  new URL("./gpu-export.js?v=59", ROOT).href,
+  new URL("./export-processor.js?v=59", ROOT).href,
+  new URL("./export-worker.js?v=59", ROOT).href,
+  new URL("./edit-state.js?v=59", ROOT).href,
+  new URL("./image-engine.js?v=59", ROOT).href,
+  new URL("./lut-loader.js?v=59", ROOT).href,
   new URL("./lut-pack-sw.js?v=1", ROOT).href,
   LUT_MANIFEST_URL,
-  new URL("./manifest.webmanifest?v=58", ROOT).href,
-  new URL("./apple-touch-icon.png?v=58", ROOT).href,
+  new URL("./manifest.webmanifest?v=59", ROOT).href,
+  new URL("./apple-touch-icon.png?v=59", ROOT).href,
   new URL("./icons/see-apple-touch-icon-120.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-152.png", ROOT).href,
   new URL("./icons/see-apple-touch-icon-167.png", ROOT).href,

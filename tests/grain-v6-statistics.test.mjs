@@ -282,7 +282,7 @@ function flatPatchStopRms(gray, grain) {
   return Math.sqrt(variance / values.length);
 }
 
-test("Grain v6.2 preserves the measured reference definitions", () => {
+test("Grain v6.3 preserves the measured reference definitions", () => {
   assert.equal(GRAIN_REFERENCE_PROFILES.A.label, "黄油100 target");
   assert.equal(GRAIN_REFERENCE_PROFILES.B.label, "Snapseed100 target");
   assert.equal(GRAIN_REFERENCE_PROFILES.A.targetGrain, 50);
@@ -293,27 +293,27 @@ test("Grain v6.2 preserves the measured reference definitions", () => {
     < GRAIN_REFERENCE_PROFILES.B.measuredMedianPeriodRefPx);
 });
 
-test("Grain v6.2 substantially shortens both profile correlation lengths", () => {
+test("Grain v6.3 locks both endpoints to the finest stable correlation band", () => {
   const profileA = shapedField(50);
   const profileB = shapedField(100);
   const aHorizontal = correlation(profileA, 1, 0);
   const aVertical = correlation(profileA, 0, 1);
   const bHorizontal = correlation(profileB, 1, 0);
   const bVertical = correlation(profileB, 0, 1);
-  assert.ok(aHorizontal > 0.02 && aHorizontal < 0.06);
-  assert.ok(aVertical > 0.02 && aVertical < 0.06);
-  assert.ok(bHorizontal > 0.05 && bHorizontal < 0.1);
-  assert.ok(bVertical > 0.05 && bVertical < 0.1);
-  assert.ok(bHorizontal > aHorizontal * 1.5);
-  assert.ok(aHorizontal < 0.070417 * 0.7);
-  assert.ok(bHorizontal < 0.18414 * 0.5);
+  assert.ok(aHorizontal > -0.04 && aHorizontal < 0.005);
+  assert.ok(aVertical > -0.04 && aVertical < 0.005);
+  assert.ok(bHorizontal > -0.03 && bHorizontal < 0.01);
+  assert.ok(bVertical > -0.03 && bVertical < 0.01);
+  assert.ok(Math.abs(bHorizontal - aHorizontal) < 0.02);
+  assert.ok(aHorizontal < 0.03816 - 0.04);
+  assert.ok(bHorizontal < 0.0728 - 0.06);
   assert.ok(Math.abs(aHorizontal - aVertical) < 0.04);
   assert.ok(Math.abs(bHorizontal - bVertical) < 0.04);
   assert.ok(Math.abs(correlation(profileA, 3, 0)) < 0.08);
   assert.ok(Math.abs(correlation(profileB, 4, 0)) < 0.08);
 });
 
-test("Grain v6.2 preserves the accepted v6.1 strength response", () => {
+test("Grain v6.3 preserves the accepted v6.1 strength response", () => {
   const profileA = flatPatchStopRms(128, 50);
   const profileB = flatPatchStopRms(128, 100);
   assert.ok(profileA > 0.18 && profileA < 0.23, `Profile A RMS ${profileA}`);
@@ -322,7 +322,7 @@ test("Grain v6.2 preserves the accepted v6.1 strength response", () => {
   assert.ok(profileB < profileA * 2);
 });
 
-test("Grain v6.2 fields remain broad-spectrum, normalized, and isotropic", () => {
+test("Grain v6.3 fields remain broad-spectrum, normalized, and isotropic", () => {
   const profileA = shapedField(50);
   const profileB = shapedField(100);
   for (const values of [profileA, profileB]) {
@@ -338,41 +338,41 @@ test("Grain v6.2 fields remain broad-spectrum, normalized, and isotropic", () =>
   }
   const spectrumA = spectralMetrics(profileA);
   const spectrumB = spectralMetrics(profileB);
-  assert.ok(spectrumA.peakFrequency > spectrumB.peakFrequency);
-  assert.ok(spectrumA.lowFrequencyRatio < spectrumB.lowFrequencyRatio);
+  assert.ok(Math.abs(spectrumA.peakFrequency - spectrumB.peakFrequency) < 0.08);
+  assert.ok(Math.abs(spectrumA.lowFrequencyRatio - spectrumB.lowFrequencyRatio) < 0.01);
 });
 
-test("Grain v6.2 strong excursions do not form large blocks", () => {
+test("Grain v6.3 strong excursions do not form large blocks", () => {
   for (const grain of [50, 100]) {
     const components = connectedComponents(shapedField(grain), 3);
     assert.ok(components.length > 100);
-    assert.ok(Math.max(...components.map(({ area }) => area)) <= 4);
+    assert.ok(Math.max(...components.map(({ area }) => area)) <= 2);
     assert.ok(Math.max(...components.map(({ diameter }) => diameter)) <= 4);
     assert.equal(components.filter(({ area }) => area > 4).length, 0);
   }
 });
 
-test("Grain v6.2 adds microscopic density variation without broad modulation", () => {
+test("Grain v6.3 adds microscopic density variation without broad modulation", () => {
   for (const grain of [50, 100]) {
     const values = shapedField(grain);
     const microscopic = localDensityVariation(values, 8);
     const broad = localDensityVariation(values, 32);
     assert.ok(microscopic.coefficientOfVariation > 0.32);
-    assert.ok(microscopic.coefficientOfVariation < 0.42);
+    assert.ok(microscopic.coefficientOfVariation < 0.38);
     assert.ok(microscopic.range >= 16);
     assert.ok(broad.coefficientOfVariation < 0.11);
     assert.ok(microscopic.coefficientOfVariation > broad.coefficientOfVariation * 3.5);
   }
 });
 
-test("Grain v6.2 has only a restrained tail of connected micro-structures", () => {
+test("Grain v6.3 has only a restrained tail of connected micro-structures", () => {
   const components = connectedComponents(shapedField(100), 2);
-  assert.ok(Math.max(...components.map(({ area }) => area)) <= 6);
-  assert.ok(Math.max(...components.map(({ diameter }) => diameter)) <= 7);
-  assert.ok(components.filter(({ area }) => area > 4).length <= 2);
+  assert.ok(Math.max(...components.map(({ area }) => area)) <= 4);
+  assert.ok(Math.max(...components.map(({ diameter }) => diameter)) <= 5);
+  assert.equal(components.filter(({ area }) => area > 4).length, 0);
 });
 
-test("Grain v6.2 preserves hue and average chroma on colored patches", () => {
+test("Grain v6.3 preserves hue and average chroma on colored patches", () => {
   const patches = [
     [220, 112, 35],
     [202, 145, 120],
@@ -429,7 +429,7 @@ test("Grain v6.2 preserves hue and average chroma on colored patches", () => {
   }
 });
 
-test("Grain v6.2 slider interpolation is continuous, deterministic, and reversible", () => {
+test("Grain v6.3 slider interpolation is continuous, deterministic, and reversible", () => {
   const before = shapedField(49);
   const anchor = shapedField(50);
   const after = shapedField(51);

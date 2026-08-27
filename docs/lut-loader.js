@@ -1,4 +1,4 @@
-import { getFilterLut, registerFilterLut } from "./image-engine.js?v=58";
+import { getFilterLut, registerFilterLut } from "./image-engine.js?v=59";
 
 export const LUT_ARCHITECTURE = "binary";
 export const LUT_PACK_VERSION = "1";
