@@ -3,7 +3,7 @@ import {
   getFilterLut,
   getGrainParameters,
   getLightParameters,
-} from "./image-engine.js?v=57";
+} from "./image-engine.js?v=58";
 
 const VERTEX_SHADER = `#version 300 es
 layout(location = 0) in vec2 aPosition;
@@ -241,30 +241,52 @@ float profileAWeight(ivec2 offset) {
 float profileBWeight(ivec2 offset) {
   ivec2 distance = abs(offset);
   if (all(equal(distance, ivec2(0)))) return 1.0;
-  if (all(equal(distance, ivec2(1, 0))) || all(equal(distance, ivec2(0, 1)))) return 0.095;
-  if (all(equal(distance, ivec2(1)))) return 0.008;
-  if (all(equal(distance, ivec2(2, 0))) || all(equal(distance, ivec2(0, 2)))) return -0.018;
+  if (all(equal(distance, ivec2(1, 0))) || all(equal(distance, ivec2(0, 1)))) return 0.067;
+  if (all(equal(distance, ivec2(1)))) return 0.0035;
+  if (all(equal(distance, ivec2(2, 0))) || all(equal(distance, ivec2(0, 2)))) return -0.0165;
   if ((distance.x == 2 && distance.y == 1) || (distance.x == 1 && distance.y == 2)) {
-    return -0.006;
+    return -0.0055;
   }
-  return -0.004;
+  return -0.0035;
+}
+
+vec2 microVariation(ivec2 point) {
+  float scaleSelector = signedHash(point, uSeed ^ 0xa511e9b3u);
+  float scaleMix = 0.55 + 0.15 * tanh(scaleSelector * 1.25);
+  uint densitySeed = uSeed ^ 0x63d83595u;
+  float densitySource = (
+    signedHash(point, densitySeed)
+    + 0.35 * (
+      signedHash(point + ivec2(-1, 0), densitySeed)
+      + signedHash(point + ivec2(1, 0), densitySeed)
+      + signedHash(point + ivec2(0, -1), densitySeed)
+      + signedHash(point + ivec2(0, 1), densitySeed)
+    )
+  ) / sqrt(1.0 + 4.0 * 0.35 * 0.35);
+  float density = 1.0 + 0.18 * tanh(densitySource * 1.1);
+  return vec2(scaleMix, density);
 }
 
 void main() {
   ivec2 point = ivec2(floor(gl_FragCoord.xy));
   float profileA = 0.0;
   float profileB = 0.0;
+  float centerExcitation = 0.0;
   for (int offsetY = -2; offsetY <= 2; offsetY += 1) {
     for (int offsetX = -2; offsetX <= 2; offsetX += 1) {
       ivec2 offset = ivec2(offsetX, offsetY);
       ivec2 samplePoint = clamp(point + offset, ivec2(0), uSize - 1);
       float sampleValue = excitation(samplePoint);
+      if (all(equal(offset, ivec2(0)))) centerExcitation = sampleValue;
       profileA += sampleValue * profileAWeight(offset);
       profileB += sampleValue * profileBWeight(offset);
     }
   }
   profileA /= 1.00308923;
-  profileB /= 1.01882481;
+  profileB /= 1.00964598;
+  vec2 variation = microVariation(point);
+  profileA = mix(centerExcitation, profileA, variation.x) * variation.y / 1.0105;
+  profileB = mix(centerExcitation, profileB, variation.x) * variation.y / 1.0105;
   outColor = vec4(
     clamp(profileA / 9.0 + 0.5, 0.0, 1.0),
     clamp(profileB / 9.0 + 0.5, 0.0, 1.0),

@@ -1,14 +1,14 @@
-import { createGpuPreviewRenderer } from "./gpu-preview.js?v=57";
-import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=57";
-import { createExportProcessor } from "./export-processor.js?v=57";
-import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=57";
+import { createGpuPreviewRenderer } from "./gpu-preview.js?v=58";
+import { attemptGpuFullResolutionExport } from "./gpu-export.js?v=58";
+import { createExportProcessor } from "./export-processor.js?v=58";
+import { getGrainParameters, hashSeed, processPixels } from "./image-engine.js?v=58";
 import {
   getLutPackStatus,
   loadFilterLut,
   prepareOfflineLutPack,
   subscribeLutPackStatus,
-} from "./lut-loader.js?v=57";
-import { hasEdits, visibleEditLabel } from "./edit-state.js?v=57";
+} from "./lut-loader.js?v=58";
+import { hasEdits, visibleEditLabel } from "./edit-state.js?v=58";
 
 const MAX_PHOTOS = 20;
 const PREVIEW_LONG_EDGE = 960;
@@ -108,7 +108,7 @@ function ensureExportProcessor() {
   if (exportProcessor) return exportProcessor;
   exportProcessor = createExportProcessor({
     createWorker: () => new Worker(
-      new URL("./export-worker.js?v=57", import.meta.url),
+      new URL("./export-worker.js?v=58", import.meta.url),
       { type: "module" },
     ),
     onWorkerCreated() {
@@ -214,7 +214,7 @@ function updateDiagnosticOverlay() {
     "Grain: " + edit.grain,
     "Light v2: " + (edit.brightness === 0 ? "off" : "active"),
     "Color v2.1: " + (edit.color === 0 ? "off" : "active"),
-    "Grain engine: v6.1 refined " + (edit.grain === 0 ? "(off)" : "(active)"),
+    "Grain engine: v6.2 morphology " + (edit.grain === 0 ? "(off)" : "(active)"),
     "Reference grain scale: 960 px long edge",
     "Profile A: " + grainParameters.profileA,
     "Profile B: " + grainParameters.profileB,
@@ -947,7 +947,7 @@ if ("serviceWorker" in navigator) {
     markStartup("window load");
     window.requestAnimationFrame(() => window.setTimeout(async () => {
       try {
-        const registration = await navigator.serviceWorker.register("./sw.js?v=57", { scope: "./" });
+        const registration = await navigator.serviceWorker.register("./sw.js?v=58", { scope: "./" });
         markStartup("LUT preparation start");
         await prepareOfflineLutPack(registration);
       } catch (error) {

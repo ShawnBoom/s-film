@@ -1,4 +1,4 @@
-import { processPixels } from "./image-engine.js?v=57";
+import { processPixels } from "./image-engine.js?v=58";
 
 function errorFrom(value, fallback = "Export Worker failed") {
   if (value instanceof Error) return value;
